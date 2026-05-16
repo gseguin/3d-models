@@ -1,0 +1,18 @@
+# Local Claude Code state
+.claude/settings.local.json
+.remember/
+
+# Build artifacts
+*.stl
+*.3mf
+*.gcode
+!**/reference/*.stl
+
+# OpenSCAD
+*.echo
+*.csg
+
+# Editor / OS
+.DS_Store
+*.swp
+*~
