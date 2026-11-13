@@ -1,5 +1,5 @@
 // ============================================================================
-// Gridfinity Parametric Silverware Organizer - V10.37
+// Gridfinity Parametric Silverware Organizer - V10.38
 // ============================================================================
 //
 // A fully parametric OpenSCAD model for creating custom silverware organizers
@@ -25,8 +25,18 @@
 // 4. Generate full organizer when satisfied
 //
 // Version History:
-// V10.37 - Fixed shim length gap: Extended shim geometry start point from -1mm 
-//          to -10mm to ensure shim covers utensil_margin offset area at handle 
+// V10.38 - Fixed fractional-edge grid bug: gf_edge_left/right/front/back
+//          previously ADDED a fractional grid unit on top of the auto-computed
+//          footprint, silently forcing a full extra 42mm Gridfinity base
+//          column/row (visually clipped to look partial) — a 5x6 layout with
+//          gf_edge_left=0.3 actually needed 6x6 of drawer space. Edges are now
+//          TRIMS (0 = full unit, 1 = fully removed) that shrink the footprint,
+//          so the physical footprint is always exactly gf_grid_x x gf_grid_y
+//          cells. Default gf_edge_left changed from 0.30 to 0.0 so a fresh
+//          load doesn't trigger this by default. (Reported by @Rhinous on
+//          MakerWorld.)
+// V10.37 - Fixed shim length gap: Extended shim geometry start point from -1mm
+//          to -10mm to ensure shim covers utensil_margin offset area at handle
 //          end, eliminating gap visible in 2D footprint.
 // V10.36 - Fixed shim wall gap: Increased lateral overlap (width + 4) for 
 //          better wall coverage.
@@ -291,12 +301,14 @@ gf_enable_stacking_lip = false;
 gf_enable_magnets = false;
 
 /* [Fractional Edges] */
-// Fractional grid units for fine-tuning bin size (0-1)
-// Allows bin to extend beyond full grid units for perfect fit
-gf_edge_left = 0.30;
-gf_edge_right = 0.0; 
-gf_edge_front = 0.0;
-gf_edge_back = 0.0; 
+// Fractional grid units to TRIM off the outer edge (0-1). 0 = full-size grid
+// unit on that side, 1 = that side's unit fully removed. Use this to shave a
+// bin down when the drawer isn't an exact multiple of 42mm — it never adds
+// footprint, so it never requires an extra Gridfinity base column/row.
+gf_edge_left = 0.0; // [0:0.01:1]
+gf_edge_right = 0.0; // [0:0.01:1]
+gf_edge_front = 0.0; // [0:0.01:1]
+gf_edge_back = 0.0; // [0:0.01:1]
 
 /* [Grid Size] */
 // Automatically calculate grid size based on content, or use manual values
@@ -514,9 +526,11 @@ gf_edge_right_mm = gf_edge_right * gf_pitch;
 gf_edge_front_mm = gf_edge_front * gf_pitch;
 gf_edge_back_mm = gf_edge_back * gf_pitch;
 
-// Calculate final bin dimensions including fractional edges
-total_width = gf_grid_x * gf_pitch - gf_clearance + gf_edge_left_mm + gf_edge_right_mm;
-total_depth = gf_grid_y * gf_pitch - gf_clearance + gf_edge_front_mm + gf_edge_back_mm;
+// Calculate final bin dimensions: full grid footprint minus any trimmed edges.
+// Trimming never grows the footprint, so it never requires an extra base
+// column/row (see gridfinity_base(), which draws exactly gf_grid_x x gf_grid_y feet).
+total_width = gf_grid_x * gf_pitch - gf_clearance - gf_edge_left_mm - gf_edge_right_mm;
+total_depth = gf_grid_y * gf_pitch - gf_clearance - gf_edge_front_mm - gf_edge_back_mm;
 
 // ============================================================================
 // EFFECTIVE DIMENSIONS & HELPER VARIABLES
@@ -525,22 +539,18 @@ total_depth = gf_grid_y * gf_pitch - gf_clearance + gf_edge_front_mm + gf_edge_b
 // ============================================================================
 use_minimalist_layout = minimalist && (generate_test_slice || generate_2d_footprint);
 
-// Minimalist mode explicitly sets edges to 0 (no fractional grid extensions)
-gf_eff_edge_front = use_minimalist_layout ? 0 : gf_edge_front_mm;
-gf_eff_edge_back = use_minimalist_layout ? 0 : gf_edge_back_mm;
-gf_eff_edge_left = use_minimalist_layout ? 0 : gf_edge_left_mm;
-gf_eff_edge_right = use_minimalist_layout ? 0 : gf_edge_right_mm;
-
 // Calculate minimal bounding box for minimalist mode
 eff_total_width = use_minimalist_layout ? (w_total_content + wall_thickness) : total_width;
 eff_total_depth = use_minimalist_layout ? (max_utensil_length + utensil_margin + 2*wall_thickness) : total_depth;
 
 // Cache available slot depth calculation (used multiple times)
-_available_slot_depth = eff_total_depth - 2 * wall_thickness - gf_eff_edge_front - gf_eff_edge_back;
+// eff_total_depth already has any trimmed edges subtracted out (see total_depth above),
+// so only the walls need to be subtracted here.
+_available_slot_depth = eff_total_depth - 2 * wall_thickness;
 
 // Misc Bin Logic
 // Calculate available width for misc bin after accounting for utensil slots
-usable_width = total_width - gf_edge_right_mm - 2 * wall_thickness;
+usable_width = total_width - 2 * wall_thickness;
 remaining_width = usable_width - w_total_content;
 
 // Misc bin is active if enabled, has enough space, and not in minimalist test mode
@@ -712,8 +722,8 @@ module render_central_trench() {
 // Layout utensil slots in linear order with optional misc bin
 module linear_slot_layout(type="slots") {
     start_x = wall_thickness;
-    // Y position accounting for front edge and wall thickness
-    y_pos = gf_eff_edge_front + wall_thickness;
+    // Trimmed edges shrink the bin from the outside; interior origin stays at wall_thickness.
+    y_pos = wall_thickness;
     
     // Handle misc bin on left side if enabled
     misc_left_w = (misc_bin_active && misc_bin_position == "left") ? misc_bin_width : 0;
@@ -745,7 +755,7 @@ module linear_slot_layout(type="slots") {
     // Handle misc bin on right side if enabled
     if (misc_bin_active && misc_bin_position == "right" && type=="slots") {
         total_utensil_w = width_1 + width_2 + width_3 + width_4 + width_5;
-        bin_end_x = eff_total_width - gf_eff_edge_right - wall_thickness;
+        bin_end_x = eff_total_width - wall_thickness;
         current_x = cursor_base + total_utensil_w;
         actual_misc_width = max(1, bin_end_x - current_x);
         translate([current_x, y_pos, 0])
@@ -1577,33 +1587,37 @@ module rounded_slot(w, l, h) {
 // Creates the base structure compatible with Gridfinity storage system
 // Includes stepped pyramid base units, optional magnet holes, and bin walls
 module gridfinity_base() {
-    // Calculate extended grid to account for fractional edges
-    gf_grid_x_extended = gf_grid_x + (gf_edge_left > 0 ? 1 : 0) + (gf_edge_right > 0 ? 1 : 0);
-    gf_grid_y_extended = gf_grid_y + (gf_edge_front > 0 ? 1 : 0) + (gf_edge_back > 0 ? 1 : 0);
-    
-    // Calculate offset for fractional edges (shifts grid to align with bin edges)
-    gf_grid_offset_x = gf_edge_left > 0 ? (1 - gf_edge_left) * gf_pitch : 0;
-    gf_grid_offset_y = gf_edge_front > 0 ? (1 - gf_edge_front) * gf_pitch : 0;
-    
+    // The bin body (walls, bottom plate, slots, trench, lip — everything else in
+    // full_organizer()) keeps its local origin at world [0,0]. Base feet always tile
+    // exactly gf_grid_x x gf_grid_y full 42mm cells — trimming never adds a cell — so
+    // here we shift the FEET by -gf_edge_left/front instead of shifting the bin body:
+    // a left/front trim removes that much bin material on that side while the feet
+    // stay a fixed gf_grid_x x gf_grid_y block, now offset to still sit under the bin.
+    //
+    // A right/back trim shrinks total_width/total_depth from that side instead (the
+    // origin-anchored wall rect naturally pulls its right/back edge inward), so the
+    // last foot column/row can now stick out past the trimmed wall on that side —
+    // intersect against the wall footprint to clip it flush.
+    foot_offset_x = -gf_edge_left_mm;
+    foot_offset_y = -gf_edge_front_mm;
     difference() {
         union() {
             // Bin walls above base
             translate([0, 0, gf_base_height + bottom_thickness])
                 rounded_rect(total_width, total_depth, final_total_height - gf_base_height - bottom_thickness, gf_bin_corner_radius);
-            
+
             // Bottom plate
             translate([0, 0, gf_base_height])
                 rounded_rect(total_width, total_depth, bottom_thickness, gf_bin_corner_radius);
-            
+
             // Base units: stepped pyramid structure for Gridfinity compatibility
-            // Intersection ensures base units only appear within bin footprint
             intersection() {
                 rounded_rect(total_width, total_depth, gf_base_height, gf_bin_corner_radius);
-                translate([-gf_grid_offset_x, -gf_grid_offset_y, 0]) {
-                    for (x = [0:gf_grid_x_extended-1]) {
-                        for (y = [0:gf_grid_y_extended-1]) {
-                            translate([x * gf_pitch + gf_clearance/2, y * gf_pitch + gf_clearance/2, 0]) 
-                            gridfinity_base_unit();
+                translate([foot_offset_x, foot_offset_y, 0]) {
+                    for (x = [0:gf_grid_x-1]) {
+                        for (y = [0:gf_grid_y-1]) {
+                            translate([x * gf_pitch + gf_clearance/2, y * gf_pitch + gf_clearance/2, 0])
+                                gridfinity_base_unit();
                         }
                     }
                 }
@@ -1611,10 +1625,10 @@ module gridfinity_base() {
         }
         // Subtract magnet holes if enabled
         if (gf_enable_magnets) {
-            translate([-gf_grid_offset_x, -gf_grid_offset_y, 0]) {
-                for (x = [0:gf_grid_x_extended-1]) {
-                    for (y = [0:gf_grid_y_extended-1]) {
-                        translate([x * gf_pitch + gf_clearance/2, y * gf_pitch + gf_clearance/2, 0]) 
+            translate([foot_offset_x, foot_offset_y, 0]) {
+                for (x = [0:gf_grid_x-1]) {
+                    for (y = [0:gf_grid_y-1]) {
+                        translate([x * gf_pitch + gf_clearance/2, y * gf_pitch + gf_clearance/2, 0])
                             magnet_holes();
                     }
                 }
