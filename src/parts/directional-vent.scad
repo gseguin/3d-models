@@ -8,12 +8,20 @@
 //
 // HARD CONSTRAINTS (summary — full details in .md):
 //   1. Lip-DOWN print orientation. Reversing breaks slat printability.
-//   2. Slat angle is FIXED. Do NOT reintroduce an open-area solver on the
-//      slat angle — that produced welded slats at low open-area targets.
+//   2. Slat angle is FIXED at 49° and CAPPED at <= 50° from vertical. Do NOT
+//      reintroduce an open-area solver on the slat angle (it produced welded
+//      slats at low open-area), and do NOT raise it above 50° (the slats stop
+//      self-supporting and the slicer clogs the airflow openings with support).
 //   3. Throttle plate sits BELOW the slats (duct → throttle → slats → room).
-//   4. Throttle is a SEPARATE part, slides in from the E side, sealed with
-//      aluminum duct tape. No clips, no detents.
+//   4. Throttle is a SEPARATE part that drops into the lower (thin-wall)
+//      cavity from the duct end and rests against the LEDGE (the inward
+//      step where walls transition from thick-upper to thin-lower).
+//      HVAC aluminum foil tape applied from the DUCT side spans the
+//      plate edge → lower wall inner face joint, sealing the perimeter
+//      AND retaining the plate against airflow. No clips, no rails.
 //   5. Dividers terminate at the throttle plate's TOP face (no collision).
+//   6. Slat zones share a 15mm tape-margin band around the plate
+//      perimeter — slots must not extend into this band.
 //
 // TESTS: run `openscad -p directional-vent.json -P "New set 1" -o /tmp/x.stl
 // directional-vent-test.scad`. Sweep open-area in {0.01, 0.05, 0.10, 0.25}.
@@ -26,9 +34,10 @@
 //   • Brim: 4-6 mm recommended — the 240+ mm lip is wide enough to lift at the
 //     corners as PETG cools.
 //   • Bed temp: 70-80 °C. Nozzle: 235-245 °C.
-//   • Supports: needed only for a small 1.8 × 5 × 135 mm strip of the E
-//     perimeter wall above the throttle opening. Bambu Studio auto-detects;
-//     support sits inside the duct cavity and peels off easily.
+//   • Supports: NONE. Slats print at 49° from vertical (41° from horizontal),
+//     within PETG's ~50°-from-vertical no-support limit, so they are
+//     self-supporting. Do NOT raise fixed_slat_angle above 50° — the slicer
+//     would fill the airflow openings with support you cannot remove.
 // ============================================================================
 // Highly restrictive vent. Lip sits flush against the wall (faces the room);
 // slats and a throttle plate hang down into the duct opening below.
@@ -135,18 +144,33 @@ divider_wall = 1.2;
 //
 // Angle measured from VERTICAL (the slat plane's normal direction). At 0°
 // the slat is vertical (no deflection). At 90° the slat is horizontal
-// (fully closed). 60–70° gives a strong sideways throw without making the
-// slats too horizontal to print cleanly.
-fixed_slat_angle = 65;
+// (fully closed).
+//
+// PRINTABILITY CAP: the slats print lip-DOWN and their bodies are a
+// continuous overhang at this angle. PETG holds an overhang up to ~50° from
+// vertical without support; beyond that the slicer fills the airflow
+// openings with support that cannot be removed (it clogs the vent). So this
+// angle MUST stay <= 50°. 49° keeps a 1° safety margin while still giving a
+// strong sideways throw (~10.8 mm at slat_body_length=14). The previous
+// value (65°) needed support and relied on permanent in-print pillars; both
+// the steep angle and the pillars have been removed. See Test F2.
+fixed_slat_angle = 49;
 
-// Slat body length along the slat's own axis (mm). At 65° this gives a
-// visible-from-the-room drop of ~5.9 mm and a sideways sweep of ~12.7 mm,
-// which fits comfortably inside the zone widths.
+// Slat body length along the slat's own axis (mm). At 49° this gives a
+// visible-from-the-room drop of ~9.2 mm and a sideways sweep of ~10.6 mm,
+// which fits comfortably inside the zone widths and clears the throttle
+// plate (slat tips reach ~z=-9.2; plate top is at dividers_bottom_z).
 slat_body_length = 14;
 
 // Slat target pitch (mm) — used to derive slat count per zone. Slats are then
 // evenly distributed across the zone with the array anchored at both walls.
 target_slat_pitch = 14;
+
+// (Slat support pillars REMOVED. They were a permanent in-print support for
+// the old 65° slats — but they floated mid-air, drew their own slicer
+// support, and the support filled the airflow openings and could not be
+// removed. The slats now print at <= 50° from vertical, which is
+// self-supporting in PETG, so no pillars are needed. See fixed_slat_angle.)
 
 // ----------------------------------------------------------------------------
 // [Side slats — East / West deflection]
@@ -208,37 +232,52 @@ throttle_plate_thickness = 1.2;
 // extrude two perimeters and the slot fuses shut. 1.2 mm = 2 line widths.
 min_printable_slot = 1.2;
 
-// ---- Slide-in channel geometry ----
-// Per-side slop between the throttle plate edges and the rails / W-notch.
-// 0.2 mm gives a clean slide-fit in PETG.
-throttle_clearance = 0.2;
-// How far the bottom rail (the support shelf) and the top rail (the cap
-// that captures the plate from above) protrude inward from the N/S/W
-// insert walls. 2 mm gives a generous channel without blocking too much
-// of the interior airflow path.
-throttle_rail_depth = 2;
+// ---- Drop-on ledge geometry ----
+// Per-side slop between the throttle plate edges and the LEDGE inner
+// boundary (the upper thick wall step). 0.4 mm/side (0.8 mm total per
+// axis) gives a clean drop-fit in PETG: a 230 mm plate vs a 240 mm-
+// cavity insert can have ~0.3 mm of PETG shrinkage delta. 0.4 mm
+// absorbs that delta plus normal extrusion variation, while still
+// registering snug against the ledge.
+//
+// Note: the gap between the plate edge and the LOWER thin wall inner
+// face is much larger (= throttle_ledge_width + throttle_clearance,
+// about 3.4 mm). HVAC tape applied to the plate's DUCT-FACING side
+// spans this gap and attaches to the lower wall's inner face, both
+// sealing the perimeter and retaining the plate against airflow.
+throttle_clearance = 0.4;
+// How far the ledge protrudes inward from the insert perimeter walls.
+// The ledge is formed by the THICKENED lower section of the insert walls
+// (see insert_walls()) — it's not a separate shelf bridging inward, it's
+// just where the wall steps inward as it transitions from the upper thin
+// section to the lower thick section. 3 mm is enough to support the plate
+// edge (5 perimeters of grip at 0.6 mm nozzle) without intruding into the
+// slat zones above.
+throttle_ledge_width = 3;
+// Bare (non-slotted) margin around the throttle plate perimeter, reserved
+// for HVAC aluminum foil tape to grip the plate's top face without
+// covering any of the airflow slots. 15 mm gives ~30 mm of tape grip
+// (15 on plate + 15 on ledge underneath) — enough for a reliable seal
+// with standard 48 mm wide HVAC tape. Increase if you want more grip;
+// decrease only if the open-area target requires more slot real estate
+// than the current margin permits.
+throttle_tape_margin = 15;
 // Distance from the insert's BOTTOM (deepest into the duct) up to the TOP
-// of the bottom rail. The plate's bottom face rests here.
+// of the ledge. The plate's bottom face rests here.
+// Derived to put the plate's TOP face flush with the dividers' duct-side
+// ends (see throttle_ledge_top_z below — it's defined to satisfy this
+// relationship, not from this offset). This parameter is the ledge's
+// height above the insert bottom = thickness of the thick lower wall
+// section in Z; it equals insert_height - (lip-side gap above ledge).
 throttle_ledge_z_offset = 8;
-// Vertical gap between bottom rail top and top rail bottom. Must be
-// >= plate_thickness + clearance for the plate to slide freely.
-//   1.2 + 0.2 = 1.4 mm.
-throttle_channel_gap = 1.4;
-// Top rail height (vertical thickness). 1.2 mm = 4 layers at 0.3 mm = clean
-// bridge spanning the channel gap below it.
-throttle_top_rail_thickness = 1.2;
-// Depth of the W-wall notch (how deep the W edge of the plate seats into
-// the W perimeter wall). The W perimeter wall is insert_wall_thickness
-// (1.8 mm); cutting 1.2 mm leaves 0.6 mm of outer wall (1 perimeter at a
-// 0.6 mm nozzle).
-throttle_w_notch_depth = 1.2;
 
 // ---- Part selector ----
-// "vent"     — render the vent body (lip, walls, slats, dividers, channel
-//              rails, W notch, E opening). Print this once.
+// "vent"     — render the vent body (lip, walls, slats, dividers, ledge).
+//              Print this once.
 // "throttle" — render the throttle plate (separate part). Print one per
-//              open-area setting you want to keep on hand. Sized to slide
-//              into the vent body printed from the SAME parameter set.
+//              open-area setting you want to keep on hand. Sized to drop
+//              onto the ledge of a vent body printed from the SAME
+//              parameter set.
 part = "vent"; // [vent, throttle]
 
 // ----------------------------------------------------------------------------
@@ -326,8 +365,45 @@ function throttle_slot_width(zone_width, zone_length, r, slot_length, min_w, cou
          w = req_total_w / count)
     max(min_w, w);
 
-// Side zones: slots run along Y (parallel to side slats' Y axis).
-side_throttle_slot_length = interior_y - 2*wall;
+// ---- Ledge / plate geometry (must come before slot sizing) ----
+// Ledge top Z = top of the lower thick wall section = where the plate
+// drops on from the duct side. Plate top will be one plate_thickness
+// above this, flush with the dividers' duct-side ends.
+throttle_ledge_top_z = -lip_thickness - insert_height
+                     + throttle_ledge_z_offset;
+
+// Throttle plate footprint.
+//
+// The neck has TWO inner sizes (that's what forms the shoulder):
+//   • LOWER (thin-wall) cavity inner = insert_outer - 2*insert_wall_thickness.
+//     The plate drops in through here from the duct side.
+//   • UPPER (thick-wall) shoulder hole = lower_inner - 2*throttle_ledge_width.
+//     The plate must NOT fit through this — it rests on the shoulder.
+//
+// So the plate is sized off the LOWER cavity (minus drop-in clearance):
+//     plate = lower_inner - 2*throttle_clearance
+// This makes the plate:
+//   • throttle_clearance smaller than the lower cavity per side → drops in.
+//   • (throttle_ledge_width - throttle_clearance) LARGER than the shoulder
+//     hole per side → seats on the shoulder (≈2.6 mm of bearing per side at
+//     the default ledge_width=3, clearance=0.4). It cannot fall through.
+//
+// (The earlier sizing subtracted ledge_width from the plate too, making it
+// SMALLER than the shoulder hole — so it fell straight through and never
+// sat on the shoulder. That was the "plate too small" bug.)
+throttle_plate_x_total = insert_outer_x - 2*insert_wall_thickness
+                       - 2*throttle_clearance;
+throttle_plate_y       = insert_outer_y - 2*insert_wall_thickness
+                       - 2*throttle_clearance;
+
+// Dividers extend from the lip down to the throttle plate's TOP face
+// (they pneumatically seal against the plate top from above).
+dividers_bottom_z = throttle_ledge_top_z + throttle_plate_thickness;
+
+// Side zones: slots run along Y (parallel to side slats' Y axis). Slot
+// length is bounded by the PLATE Y minus the tape margin on each end
+// (so the perimeter band around the slot array stays clear for tape).
+side_throttle_slot_length = throttle_plate_y - 2*throttle_tape_margin;
 side_throttle_slot_count  = throttle_slot_count(side_zone_width, interior_y,
                                                 side_open_area,
                                                 side_throttle_slot_length,
@@ -340,8 +416,12 @@ side_throttle_slot_width  = throttle_slot_width(side_zone_width, interior_y,
 
 // Center zone: slots run along X (parallel to center slats' X axis). The
 // "zone width" here (the dimension perpendicular to slots) is interior_y;
-// the "zone length" (parallel to slots) is center_zone_length.
-center_throttle_slot_length = center_zone_length - 2*wall;
+// the "zone length" (parallel to slots) is center_zone_length. Slot
+// length is also bounded by the PLATE X minus the tape margin (so slots
+// don't extend into the perimeter tape band on the long-axis ends).
+center_throttle_slot_length = min(center_zone_length,
+                                  throttle_plate_x_total - 2*throttle_tape_margin)
+                            - 2*wall;
 center_throttle_slot_count  = throttle_slot_count(interior_y, center_zone_length,
                                                   center_open_area,
                                                   center_throttle_slot_length,
@@ -360,50 +440,8 @@ _center_eff_open = (center_throttle_slot_count * center_throttle_slot_width
                     * center_throttle_slot_length)
                  / (interior_y * center_zone_length);
 
-// ---- Throttle slide-in channel geometry (derived) ----
-// Z coordinates (consistent with the rest of the file: z=0 is lip top,
-// z=-lip_thickness is lip bottom / room face of insert, z=-lip_thickness
-// -insert_height is duct face / bottom of insert).
-
-// Bottom rail top Z = where the plate's bottom face rests. (Kept named
-// `throttle_ledge_top_z` for backward compatibility with code that references
-// the previous design's ledge.)
-throttle_ledge_top_z = -lip_thickness - insert_height
-                     + throttle_ledge_z_offset;
-
-// Top rail (cap) Z range — bottom of top rail is one channel_gap above the
-// bottom rail top, so a plate of throttle_plate_thickness slides through
-// with throttle_clearance to spare. Top of top rail = bottom + thickness.
-throttle_top_rail_bottom_z = throttle_ledge_top_z + throttle_channel_gap;
-throttle_top_rail_top_z    = throttle_top_rail_bottom_z
-                           + throttle_top_rail_thickness;
-
-// E-side opening Z range — the E perimeter wall is removed over this Z so
-// the plate can slide in. Spans from the bottom rail top up to the top rail
-// bottom (the full channel gap).
-throttle_e_opening_bottom_z = throttle_ledge_top_z;
-throttle_e_opening_top_z    = throttle_top_rail_bottom_z;
-
-// Throttle plate footprint:
-//   - X: spans the full insert outer X (from W outer face — seated in the
-//     W notch — to E outer face, flush with the E opening), minus
-//     throttle_clearance so it doesn't bottom out against the W notch
-//     on insertion. The E end is sealed with aluminum duct tape after
-//     installation, so no finger tab is needed.
-//   - Y: spans the full insert interior Y minus per-side clearance. The
-//     plate's Y edges sit UNDER the top rail (which extends inward by
-//     throttle_rail_depth from each N/S wall), capturing the plate from
-//     above. The bottom rail supports the plate from below across the same
-//     Y range. So the plate is captured top-and-bottom over a strip of
-//     width `throttle_rail_depth` along each Y edge.
-throttle_plate_x_total = insert_outer_x - throttle_clearance;
-throttle_plate_y       = interior_y - 2*throttle_clearance;
-
-// Dividers extend from the lip down to the throttle plate's TOP face (so
-// they rest on top of the plate without intersecting it). Below the plate
-// is undifferentiated duct air — dividers there would waste filament AND
-// collide with the plate.
-dividers_bottom_z = throttle_ledge_top_z + throttle_plate_thickness;
+// (Throttle ledge / plate / divider Z values are defined above, before
+// slot sizing, because the slot length depends on the plate dimensions.)
 
 // Echo derived geometry.
 echo(str("Side   angle=", side_slat_angle, "° (fixed), slats=", side_slat_count,
@@ -461,19 +499,9 @@ module vent_body() {
                     dividers();
                 }
             }
-            // Bottom and top rails of the slide-in channel for the throttle
-            // plate. Rails live on N/S/W walls only — the E wall has an
-            // opening so the plate can slide in.
-            throttle_bottom_rail();
-            throttle_top_rail();
+            // (Throttle plate ledge is formed by the thickened lower
+            // section of insert_walls() — no separate ledge module.)
         }
-        // E-side opening: remove the E perimeter wall over the channel Z
-        // range so the throttle plate can slide in horizontally.
-        throttle_e_opening();
-        // W-wall notch: small horizontal slot cut into the inside face of
-        // the W perimeter wall, into which the plate's W edge seats for a
-        // tight pneumatic seal.
-        throttle_w_notch();
         mount_holes();
     }
 }
@@ -546,18 +574,59 @@ module lip_rim() {
 }
 
 // ----------------------------------------------------------------------------
-// Insert walls — perimeter walls that extend into the duct opening
+// Insert walls — perimeter walls extending into the duct opening.
+//
+// Two-section profile in Z:
+//   • UPPER section (lip bottom down to ledge top, room side of plate):
+//     walls THICKENED inward by throttle_ledge_width. The BOTTOM face
+//     of this thick section (at z = throttle_ledge_top_z +
+//     throttle_plate_thickness = dividers_bottom_z) is the LEDGE that
+//     the plate seats against from below. Airflow pushes the plate UP
+//     against this ledge; HVAC tape across the plate-to-ledge joint
+//     seals the perimeter and prevents rattle.
+//   • LOWER section (ledge bottom down to insert bottom, duct side of
+//     plate): walls are THIN (insert_wall_thickness). The plate drops
+//     into this wider lower cavity from the duct end with
+//     throttle_clearance of slop, then is pushed up against the ledge
+//     by airflow.
+//
+// The slicer fills the thicker upper section with sparse infill.
 // ----------------------------------------------------------------------------
 module insert_walls() {
-    // Inner cavity is sized by `wall` (used everywhere else for slat anchoring
-    // math), but the actual perimeter wall thickness can be thinner.
-    inner_w = insert_outer_x - 2 * insert_wall_thickness;
-    inner_d = insert_outer_y - 2 * insert_wall_thickness;
-    translate([0, 0, -lip_thickness - insert_height])
-        linear_extrude(height = insert_height)
+    z_bottom    = -lip_thickness - insert_height;  // duct face / insert bottom
+    z_lip_under = -lip_thickness;                  // lip underside
+    // Ledge sits at the plate's TOP face (room side of the plate).
+    z_ledge     = throttle_ledge_top_z + throttle_plate_thickness;
+
+    outer_w = insert_outer_x;
+    outer_d = insert_outer_y;
+
+    // Upper section: THICK walls; ledge protrudes inward to seat the
+    // plate from above.
+    upper_inner_w = insert_outer_x - 2 * insert_wall_thickness
+                  - 2 * throttle_ledge_width;
+    upper_inner_d = insert_outer_y - 2 * insert_wall_thickness
+                  - 2 * throttle_ledge_width;
+
+    // Lower section: THIN walls; wider cavity accepts the plate from
+    // the duct end.
+    lower_inner_w = insert_outer_x - 2 * insert_wall_thickness;
+    lower_inner_d = insert_outer_y - 2 * insert_wall_thickness;
+
+    // Upper (thick) section — room side of plate; bottom face is the ledge.
+    translate([0, 0, z_ledge])
+        linear_extrude(height = z_lip_under - z_ledge)
             difference() {
-                square([insert_outer_x, insert_outer_y], center = true);
-                square([inner_w, inner_d], center = true);
+                square([outer_w, outer_d], center = true);
+                square([upper_inner_w, upper_inner_d], center = true);
+            }
+
+    // Lower (thin) section — duct side of plate.
+    translate([0, 0, z_bottom])
+        linear_extrude(height = z_ledge - z_bottom)
+            difference() {
+                square([outer_w, outer_d], center = true);
+                square([lower_inner_w, lower_inner_d], center = true);
             }
 }
 
@@ -573,22 +642,16 @@ module dividers() {
     div_x_center = (side_inner_x + center_outer_x) / 2;
 
     // Walls span from the top of the lip (z=0) down to the throttle plate's
-    // seating level (z = dividers_bottom_z). Below the throttle plate is just
+    // top face (z = dividers_bottom_z). Below the throttle plate is just
     // undifferentiated duct air, so material there would be wasted.
-    // Hollowed: a 6-walled shell of thickness `divider_wall`. The cavity is
-    // fully enclosed so airflow can't leak between zones and the print is
-    // clean (no blind pockets, no trapped support).
+    // Solid blocks: the slicer fills the interior with sparse infill,
+    // which is more reliable than printing thin shell walls with blind
+    // cavities and trapped-support risk.
     div_depth = -dividers_bottom_z;  // positive height from z=0 down
     div_center_z = dividers_bottom_z / 2;
     for (side = [-1, +1]) {
         translate([side * div_x_center, 0, div_center_z])
-            difference() {
-                cube([divider_width, interior_y, div_depth], center = true);
-                cube([divider_width - 2*divider_wall,
-                      interior_y    - 2*divider_wall,
-                      div_depth     - 2*divider_wall],
-                     center = true);
-            }
+            cube([divider_width, interior_y, div_depth], center = true);
     }
     // Wedge extensions on the outer (side-zone-facing) face of each divider.
     // Each wedge replaces the innermost side slat by making the divider's
@@ -716,137 +779,15 @@ module center_slats() {
     }
 }
 
-// ----------------------------------------------------------------------------
-// Throttle bottom rail — inward shelf on the N, S, and W interior walls (NO
-// E wall — E is open so the plate can slide in). Plate's bottom face rests
-// on top of this rail.
-//
-// Implementation: a U-shape (three connected strips) at the rail height,
-// each `throttle_rail_depth` thick (radially inward).
-// ----------------------------------------------------------------------------
-module throttle_bottom_rail() {
-    rail_h = throttle_rail_depth;  // height of the rail in Z
-    z_lo = throttle_ledge_top_z - rail_h;
+// (Slat support pillars REMOVED — see the note where fixed_slat_angle is
+// defined. The slats are now self-supporting at <= 50° from vertical, so the
+// permanent in-print pillars that used to bridge adjacent slats are gone.)
 
-    // Wall inner faces
-    n_y =  insert_outer_y/2 - insert_wall_thickness;  // N wall inner face
-    s_y = -insert_outer_y/2 + insert_wall_thickness;  // S wall inner face
-    w_x = -insert_outer_x/2 + insert_wall_thickness;  // W wall inner face
-    e_x =  insert_outer_x/2 - insert_wall_thickness;  // E wall inner face
-
-    // N and S rails: run E-W along the long walls, full length minus a bit
-    // at the E end so they don't poke into the E opening.
-    n_rail_y = n_y - throttle_rail_depth/2;  // centerline
-    s_rail_y = s_y + throttle_rail_depth/2;
-    // Length: from W inner face to E inner face (full interior).
-    rail_x_length = e_x - w_x;
-    rail_x_center = (e_x + w_x) / 2;
-
-    // W rail: runs N-S along the W wall.
-    w_rail_x = w_x + throttle_rail_depth/2;
-    w_rail_y_length = n_y - s_y;
-    w_rail_y_center = 0;
-
-    translate([0, 0, z_lo])
-        linear_extrude(height = rail_h)
-            union() {
-                // N rail
-                translate([rail_x_center, n_rail_y])
-                    square([rail_x_length, throttle_rail_depth], center = true);
-                // S rail
-                translate([rail_x_center, s_rail_y])
-                    square([rail_x_length, throttle_rail_depth], center = true);
-                // W rail
-                translate([w_rail_x, w_rail_y_center])
-                    square([throttle_rail_depth, w_rail_y_length], center = true);
-            }
-}
-
-// ----------------------------------------------------------------------------
-// Throttle top rail — inward cap on the N, S, and W interior walls, above
-// the bottom rail. Together with the bottom rail it forms a horizontal
-// channel that captures the throttle plate's edges.
-// ----------------------------------------------------------------------------
-module throttle_top_rail() {
-    rail_h = throttle_top_rail_thickness;
-    z_lo = throttle_top_rail_bottom_z;
-
-    n_y =  insert_outer_y/2 - insert_wall_thickness;
-    s_y = -insert_outer_y/2 + insert_wall_thickness;
-    w_x = -insert_outer_x/2 + insert_wall_thickness;
-    e_x =  insert_outer_x/2 - insert_wall_thickness;
-
-    n_rail_y = n_y - throttle_rail_depth/2;
-    s_rail_y = s_y + throttle_rail_depth/2;
-    rail_x_length = e_x - w_x;
-    rail_x_center = (e_x + w_x) / 2;
-
-    w_rail_x = w_x + throttle_rail_depth/2;
-    w_rail_y_length = n_y - s_y;
-
-    translate([0, 0, z_lo])
-        linear_extrude(height = rail_h)
-            union() {
-                translate([rail_x_center, n_rail_y])
-                    square([rail_x_length, throttle_rail_depth], center = true);
-                translate([rail_x_center, s_rail_y])
-                    square([rail_x_length, throttle_rail_depth], center = true);
-                translate([w_rail_x, 0])
-                    square([throttle_rail_depth, w_rail_y_length], center = true);
-            }
-}
-
-// ----------------------------------------------------------------------------
-// Throttle E-side opening — subtract the E perimeter wall over the channel
-// Z range so the throttle plate can slide in horizontally from the E side.
-// Width along Y matches the plate's full Y extent (plus clearance) so the
-// plate BODY (not just the tab) fits through. This means the E wall is
-// effectively removed across the full insert interior Y over the 1.4 mm
-// channel height.
-// ----------------------------------------------------------------------------
-module throttle_e_opening() {
-    // Opening Y width: full plate Y plus clearance per side (equals the
-    // insert interior Y by construction).
-    opening_y = throttle_plate_y + 2*throttle_clearance;
-    // Opening Z range: full channel gap. Slightly oversized by eps for
-    // clean CSG.
-    z_lo = throttle_e_opening_bottom_z - eps;
-    z_hi = throttle_e_opening_top_z + eps;
-    opening_z = z_hi - z_lo;
-    // Cut all the way through the E wall (and a tiny bit further for clean CSG).
-    cut_x_depth = insert_wall_thickness + 2*eps;
-    cut_x_center = insert_outer_x/2 - insert_wall_thickness/2;
-
-    translate([cut_x_center, 0, z_lo + opening_z/2])
-        cube([cut_x_depth, opening_y, opening_z], center = true);
-}
-
-// ----------------------------------------------------------------------------
-// Throttle W-wall notch — a horizontal slot cut into the inside face of the
-// W perimeter wall, at the channel Z range. The throttle plate's W edge
-// slides into this notch and seats against the back of it for a pneumatic
-// seal.
-// ----------------------------------------------------------------------------
-module throttle_w_notch() {
-    // Slot Z: same as the channel.
-    z_lo = throttle_e_opening_bottom_z - eps;
-    z_hi = throttle_e_opening_top_z + eps;
-    notch_z = z_hi - z_lo;
-    // Slot Y: full interior Y minus rail material at top/bottom (the rails
-    // extend into the slot from above and below — we don't need to cut them
-    // away, but the slot itself needs to be Y-wide enough to clear the rail
-    // depth).
-    notch_y = insert_outer_y - 2*insert_wall_thickness;
-    // Slot cuts into the W wall by throttle_w_notch_depth from the inside
-    // face inward (i.e. outward in the global -X direction).
-    cut_x_depth = throttle_w_notch_depth + eps;
-    w_inner_x = -insert_outer_x/2 + insert_wall_thickness;
-    // Cube center X: starts at the W inner face and extends OUTWARD (toward -X).
-    cut_x_center = w_inner_x - cut_x_depth/2;
-
-    translate([cut_x_center, 0, z_lo + notch_z/2])
-        cube([cut_x_depth, notch_y, notch_z], center = true);
-}
+// (The throttle plate's support ledge is formed by the thickened lower
+// section of insert_walls() — there is no separate ledge / rail / notch
+// module. The plate drops onto the inward step from the duct side and is
+// held in place with HVAC aluminum foil tape applied across the
+// plate-to-ledge joint.)
 
 // ----------------------------------------------------------------------------
 // Throttle (the separate, removable part)
@@ -860,19 +801,29 @@ module throttle_w_notch() {
 // so it can be installed either way around.
 // ----------------------------------------------------------------------------
 module throttle() {
-    // Per-zone slot positions are anchored to the vent body's zone layout,
-    // which is defined in interior_x/y coordinates. The plate is centered
-    // on the origin so its X positions match the vent body's zone X
-    // positions exactly.
+    // Plate-edge tape band: a non-slotted strip of throttle_tape_margin
+    // around the plate perimeter is reserved for HVAC tape grip. Slot
+    // arrays are clamped to stay inside (plate_dim - 2*tape_margin) on
+    // each axis.
     side_inner_x = interior_x/2 - side_zone_width;
+    plate_half_x = throttle_plate_x_total / 2;
+    plate_half_y = throttle_plate_y / 2;
 
-    side_span = side_zone_width - 2*wall;
+    // Per-side overlap on the plate: from side_inner_x outward to whichever
+    // is closer — the zone outer edge (interior_x/2) or the plate boundary
+    // minus the tape margin.
+    side_overlap_outer = min(interior_x/2, plate_half_x - throttle_tape_margin);
+    side_overlap_inner = side_inner_x + wall;
+    side_span = max(0, side_overlap_outer - side_overlap_inner);
+    side_overlap_center = (side_overlap_outer + side_overlap_inner) / 2;
     side_pitch = side_throttle_slot_count > 1
         ? (side_span - side_throttle_slot_width)
           / (side_throttle_slot_count - 1)
         : 0;
 
-    center_span = interior_y - 2*wall;
+    // Center-zone slot array Y span: bounded by plate_y minus tape margin
+    // (so no slot edges encroach on the N/S tape strip).
+    center_span = throttle_plate_y - 2*throttle_tape_margin;
     center_pitch = center_throttle_slot_count > 1
         ? (center_span - center_throttle_slot_width)
           / (center_throttle_slot_count - 1)
@@ -883,12 +834,10 @@ module throttle() {
         difference() {
             square([throttle_plate_x_total, throttle_plate_y], center = true);
 
-            // Side zone slots (E and W).
+            // Side zone slots (E and W) — anchored within the plate's
+            // overlap with each side zone.
             for (side = [-1, +1]) {
-                zone_outer_x = side * interior_x/2;
-                zone_inner_x = side * side_inner_x;
-                zone_center_x = (zone_outer_x + zone_inner_x) / 2;
-                array_x0 = zone_center_x
+                array_x0 = side * side_overlap_center
                          - (side_throttle_slot_count - 1) * side_pitch / 2;
                 for (i = [0 : side_throttle_slot_count - 1]) {
                     translate([array_x0 + i * side_pitch, 0])

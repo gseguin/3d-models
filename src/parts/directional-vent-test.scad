@@ -21,6 +21,22 @@ assert(center_slat_angle == fixed_slat_angle,
        str("F FAIL: center_slat_angle (", center_slat_angle,
            ") != fixed_slat_angle (", fixed_slat_angle, ")"));
 
+// --- Test F2: slat angle is PRINTABLE WITHOUT SUPPORT in PETG ---
+// fixed_slat_angle is measured from vertical. The repo's documented PETG
+// overhang limit is ~50° from vertical without support. The slats are
+// anchored at the top (lip) and at both Y ends, but their bodies are a
+// continuous overhang at this angle — so the angle itself must stay at or
+// below the limit, otherwise the slicer fills the airflow openings with
+// support that cannot be removed. This is the constraint that replaced the
+// (removed) permanent support pillars.
+petg_overhang_limit_from_vertical = 50;
+echo(str("F2: fixed_slat_angle=", fixed_slat_angle,
+         " (from vertical) limit=", petg_overhang_limit_from_vertical));
+assert(fixed_slat_angle <= petg_overhang_limit_from_vertical,
+       str("F2 FAIL: slat angle ", fixed_slat_angle,
+           "° from vertical exceeds the ", petg_overhang_limit_from_vertical,
+           "° PETG no-support limit — openings will clog with support"));
+
 // --- Test A: side throttle delivers requested open-area ratio ---
 // At target ratios above the printable floor: actual ratio is within 20%.
 // At/below the printable floor: actual ratio may exceed target (one slot
@@ -110,38 +126,56 @@ assert(abs(dividers_bottom_z - _expected_dividers_bottom_z) < 0.001,
        str("L FAIL: divider bottom z ", dividers_bottom_z,
            " != ", _expected_dividers_bottom_z));
 
-// --- Test M: throttle plate is the length of the outer E/W neck distance ---
-// Plate spans from the W outer face (seated in W-wall notch) to the E
-// outer face (flush with E opening), minus throttle_clearance so it
-// doesn't bottom-out on insertion. No finger tab — duct tape over the E
-// opening secures it.
-_expected_plate_x_total = insert_outer_x - throttle_clearance;
+// --- Test M: throttle plate X drops into the LOWER cavity with clearance ---
+// The plate is sized off the LOWER (thin-wall) cavity, not the upper shoulder
+// hole: plate X = lower_inner_x - 2*clearance. This is what lets it drop in
+// from the duct side with throttle_clearance of slop per side AND still be
+// wider than the upper shoulder hole so it seats on the shoulder (see M2).
+_lower_inner_x = insert_outer_x - 2*insert_wall_thickness;
+_expected_plate_x_total = _lower_inner_x - 2*throttle_clearance;
 echo(str("M: throttle_plate_x_total=", throttle_plate_x_total,
          " expected=", _expected_plate_x_total));
 assert(abs(throttle_plate_x_total - _expected_plate_x_total) < 0.001,
        str("M FAIL: plate x total ", throttle_plate_x_total,
            " != ", _expected_plate_x_total));
 
-// --- Test N: plate N-S spans full interior with clearance, edges captured
-// by top/bottom rails ---
-// Plate Y = interior_y - 2*clearance. The rails (throttle_rail_depth wide
-// each) extend over the outer rail_depth of plate Y on each side, capturing
-// the plate vertically.
-_expected_plate_y = interior_y - 2*throttle_clearance;
+// --- Test N: throttle plate Y drops into the LOWER cavity with clearance ---
+_lower_inner_y = insert_outer_y - 2*insert_wall_thickness;
+_expected_plate_y = _lower_inner_y - 2*throttle_clearance;
 echo(str("N: throttle_plate_y=", throttle_plate_y,
          " expected=", _expected_plate_y));
 assert(abs(throttle_plate_y - _expected_plate_y) < 0.001,
        str("N FAIL: plate y ", throttle_plate_y,
            " != ", _expected_plate_y));
 
-// --- Test O: top rail bottom Z sits one channel-gap above the bottom rail
-// top (= throttle_ledge_top_z), giving plate Z clearance ---
-_expected_top_rail_bottom_z = throttle_ledge_top_z + throttle_channel_gap;
-echo(str("O: throttle_top_rail_bottom_z=", throttle_top_rail_bottom_z,
-         " expected=", _expected_top_rail_bottom_z));
-assert(abs(throttle_top_rail_bottom_z - _expected_top_rail_bottom_z) < 0.001,
-       str("O FAIL: top rail bottom z ", throttle_top_rail_bottom_z,
-           " != ", _expected_top_rail_bottom_z));
+// --- Test M2: the plate actually SEATS on the shoulder (does not fall through) ---
+// The upper (thick) wall section's inner hole is the shoulder opening. For the
+// plate to rest ON the shoulder rather than drop through it, the plate must be
+// LARGER than the shoulder hole on every side. Overlap per side must be > 0;
+// we require a meaningful seat (>= 1 mm, ~2 perimeters of bearing).
+_upper_inner_x = insert_outer_x - 2*insert_wall_thickness - 2*throttle_ledge_width;
+_upper_inner_y = insert_outer_y - 2*insert_wall_thickness - 2*throttle_ledge_width;
+_seat_x = (throttle_plate_x_total - _upper_inner_x) / 2;
+_seat_y = (throttle_plate_y       - _upper_inner_y) / 2;
+echo(str("M2: shoulder seat per side X=", _seat_x, " Y=", _seat_y,
+         " (must be > 0; plate must overhang the shoulder hole)"));
+assert(_seat_x >= 1.0,
+       str("M2 FAIL: plate seats on shoulder by only ", _seat_x,
+           " mm in X — plate would fall through the shoulder hole"));
+assert(_seat_y >= 1.0,
+       str("M2 FAIL: plate seats on shoulder by only ", _seat_y,
+           " mm in Y — plate would fall through the shoulder hole"));
+
+// --- Test O: plate top Z is flush with the dividers' duct-side ends ---
+// Plate top = ledge_top + plate_thickness; dividers extend down to that
+// same Z (dividers_bottom_z). So plate top and divider bottom should be
+// equal — the dividers pneumatically seal against the plate top.
+_plate_top_z = throttle_ledge_top_z + throttle_plate_thickness;
+echo(str("O: plate top z=", _plate_top_z,
+         " dividers_bottom_z=", dividers_bottom_z));
+assert(abs(_plate_top_z - dividers_bottom_z) < 0.001,
+       str("O FAIL: plate top z ", _plate_top_z,
+           " != divider bottom z ", dividers_bottom_z));
 
 // --- Test Q: slat thickness optimized to minimum printable (2 perimeters
 // at 0.6 mm nozzle = 1.2 mm) ---
@@ -167,16 +201,48 @@ echo(str("S: lip_overhang_short=", lip_overhang_short, " expected=10"));
 assert(abs(lip_overhang_short - 10) < 0.001,
        str("S FAIL: lip_overhang_short ", lip_overhang_short, " != 10"));
 
-// --- Test P: E opening Z range matches the channel ---
-// The E wall is removed (subtracted) over a Z range that spans the channel
-// so the plate can slide in. Opening Z bottom = bottom rail top; top = top
-// rail bottom. (We expose throttle_e_opening_bottom_z / _top_z for testing.)
-echo(str("P: e opening z=[", throttle_e_opening_bottom_z, ", ",
-         throttle_e_opening_top_z, "]",
-         " expected=[", throttle_ledge_top_z, ", ",
-         throttle_top_rail_bottom_z, "]"));
-assert(abs(throttle_e_opening_bottom_z - throttle_ledge_top_z) < 0.001
-       && abs(throttle_e_opening_top_z - throttle_top_rail_bottom_z) < 0.001,
-       "P FAIL: E opening Z range doesn't match channel");
+// --- Test P: ledge inward width is 3 mm (~5 perimeters at 0.6 mm nozzle) ---
+// The ledge protrudes inward from the perimeter walls by throttle_ledge_
+// width. It's just enough to support the plate edge without intruding
+// into the slat zone above.
+echo(str("P: throttle_ledge_width=", throttle_ledge_width,
+         " (plate sits on the step at z=", throttle_ledge_top_z, ")"));
+assert(throttle_ledge_width >= 1.2,
+       str("P FAIL: ledge width ", throttle_ledge_width,
+           " < 1.2 mm — too narrow to support plate edge"));
+assert(throttle_ledge_width <= 10,
+       str("P FAIL: ledge width ", throttle_ledge_width,
+           " > 10 mm — intrudes too far into airflow path"));
+
+// (Tests T and V — slat support pillars — removed. The pillars were a
+// permanent in-print support for the old 65° slats. At the current
+// printable slat angle (<= 50° from vertical, Test F2) the slats are
+// self-supporting, so the pillars were deleted along with their geometry.)
+
+// --- Test W: slot dimensions respect the tape margin ---
+// A non-slotted band of throttle_tape_margin width must remain around
+// the plate perimeter so HVAC tape has somewhere to grip without
+// covering airflow slots. Validates that:
+//   • Side slot length (along Y) ≤ plate_y - 2*tape_margin
+//   • Center slot length (along X) ≤ plate_x - 2*tape_margin
+//   • Center slot array Y span (count × pitch) ≤ plate_y - 2*tape_margin
+_side_slot_y_extent = side_throttle_slot_length;
+_center_slot_x_extent = center_throttle_slot_length;
+_max_y_extent = throttle_plate_y - 2*throttle_tape_margin;
+_max_x_extent = throttle_plate_x_total - 2*throttle_tape_margin;
+echo(str("W: side slot Y=", _side_slot_y_extent, " max=", _max_y_extent,
+         " | center slot X=", _center_slot_x_extent, " max=", _max_x_extent,
+         " | tape_margin=", throttle_tape_margin));
+assert(_side_slot_y_extent <= _max_y_extent + 0.001,
+       str("W FAIL: side slot Y extent ", _side_slot_y_extent,
+           " exceeds plate_y - 2*tape_margin = ", _max_y_extent));
+assert(_center_slot_x_extent <= _max_x_extent + 0.001,
+       str("W FAIL: center slot X extent ", _center_slot_x_extent,
+           " exceeds plate_x - 2*tape_margin = ", _max_x_extent));
+// Center slot array Y span: count slots of width center_throttle_slot_width
+// spaced over center_span = plate_y - 2*tape_margin. The outermost slot
+// centers sit at ±(center_span - slot_width)/2; outer edges at ±center_span/2.
+assert(throttle_plate_y - 2*throttle_tape_margin >= center_throttle_slot_width - 0.001,
+       str("W FAIL: tape margin leaves no room for center slot width"));
 
 echo("ALL TESTS PASSED");

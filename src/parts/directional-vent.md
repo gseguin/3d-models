@@ -13,7 +13,7 @@ A highly restrictive directional HVAC ceiling vent for a 242 × 140 mm rectangul
 - **Material:** PETG (compatibility with duct temperatures up to ~60 °C; PLA softens at 50 °C)
 - **Layer height:** 0.32 mm
 - **Orientation:** lip face **down** on the bed; insert walls rise upward.
-- **Supports:** required only for a small 1.8 × 5 × 135 mm strip of the E perimeter wall above the throttle opening. Auto-detected by Bambu Studio. All other features are no-support.
+- **Supports:** none. The slats print at 49° from vertical (41° from horizontal), within PETG's ~50°-from-vertical no-support limit, so they are self-supporting. The shoulder that the throttle plate seats on is a downward step in the wall but is backed by the lower wall section, not an unsupported overhang.
 
 ## Parts
 
@@ -30,12 +30,12 @@ To swap the open-area setting, print a new throttle (cheap, ~10 minutes) and rep
 
 These are **load-bearing** design choices. Don't change them without re-deriving the affected geometry.
 
-1. **Lip-down print orientation.** Slats overhang at ~25° from horizontal; printing slats-down would require supports through the slat channels.
-2. **Slat angle is FIXED (`fixed_slat_angle = 65°`), independent of the open-area target.** The previous design solved for slat angle as a function of `*_open_area`, which produced welded slats at low open-area targets (≤5%). The current design decouples direction (slats) from restriction (throttle plate slots). **Do not re-introduce an open-area solver on the slat angle.**
-3. **Throttle plate sits BELOW the slats** (deeper into the duct). Airflow chain: `duct → throttle → slats → lip → room`. The throttle meters; the slats steer the metered air.
-4. **Throttle plate is a separate printed part.** It slides into a channel formed by top + bottom rails on the N/S/W walls. The E perimeter wall has a horizontal opening through which the plate slides in. Aluminum duct tape over the E opening secures the plate.
-5. **No clip retention on the throttle plate.** Previous designs used cantilever fingers + groove undercuts; this caused floating-bump geometry and CSG manifold issues, and was hard to remove for swapping. Slide-in + tape is mechanically simpler and lets the user re-tape after each swap.
-6. **Dividers terminate at the throttle plate's TOP face (z = -13.8).** Going lower causes them to collide with the plate; going higher leaves an air leak between zones above the plate. The current value is `throttle_ledge_top_z + throttle_plate_thickness`.
+1. **Lip-down print orientation.** Slats overhang at 41° from horizontal (49° from vertical); printing slats-down would require supports through the slat channels.
+2. **Slat angle is FIXED (`fixed_slat_angle = 49°`), independent of the open-area target, AND capped at ≤ 50° from vertical for printability.** Two separate reasons: (a) The previous design solved for slat angle as a function of `*_open_area`, which produced welded slats at low open-area targets (≤5%); the current design decouples direction (slats) from restriction (throttle plate slots) — **do not re-introduce an open-area solver on the slat angle.** (b) The slats print lip-down and their bodies are a continuous overhang at this angle; PETG holds ≤50° from vertical without support, so a steeper angle fills the airflow openings with unremovable support. The angle was **65°** until it was found to clog the vent with support; it was lowered to 49° (1° safety margin under the limit). The ~17% loss of lateral throw (12.7 → 10.6 mm) was accepted in exchange for a no-support print. **Do not raise it above 50°.**
+3. **Throttle plate sits BELOW the slats** (deeper into the duct). Airflow chain: `duct → throttle → slats → lip → room`. The throttle meters; the slats steer the metered air. This is also why the plate needs no positive *upward* retention: a supply vent pushes the plate up toward the lip, where the dividers/slats (bottoming out at the plate's top face) act as the up-stop.
+4. **Throttle plate is a separate printed part that drops onto a shoulder.** The insert walls are thick in the upper section and thin in the lower section; the step between them is the **shoulder**. The plate drops in from the duct side into the wider lower cavity and rests on the shoulder. It is sized off the LOWER cavity (`lower_inner − 2·throttle_clearance`), which makes it (a) `throttle_clearance` smaller than the lower cavity per side → drops in, and (b) `(throttle_ledge_width − throttle_clearance) ≈ 2.6 mm` larger than the upper shoulder hole per side → **seats on the shoulder instead of falling through.** HVAC aluminum foil tape from the duct side spans the plate-edge → lower-wall-inner-face joint, sealing the perimeter and securing the plate. (Earlier sizing subtracted `throttle_ledge_width` from the plate too, making it *smaller* than the shoulder hole — the "plate too small, won't sit on the shoulder" bug.)
+5. **No clip retention on the throttle plate.** Previous designs used cantilever fingers + groove undercuts; this caused floating-bump geometry and CSG manifold issues, and was hard to remove for swapping. Drop-on shoulder + tape is mechanically simpler and lets the user re-tape after each swap.
+6. **Dividers terminate at the throttle plate's TOP face (z = -12.6).** Going lower causes them to collide with the plate; going higher leaves an air leak between zones above the plate. The current value is `throttle_ledge_top_z + throttle_plate_thickness`.
 
 ## Coordinate System
 
@@ -53,13 +53,13 @@ These are **load-bearing** design choices. Don't change them without re-deriving
 | `0` | 0 | Lip top (room-facing surface) |
 | `-lip_thickness` | -1.8 | Lip bottom |
 | `slat_top_z` | 0 | Top of slats (anchored to lip) |
-| `-slat_drop·cos(angle)` | ~-5.9 | Bottom of slat tips |
-| `dividers_bottom_z` | -13.8 | Divider bottoms; rests on throttle plate top |
-| `throttle_top_rail_top_z` | -12.4 | Top of top rail |
-| `throttle_top_rail_bottom_z` | -13.6 | Bottom of top rail = top of channel |
-| `throttle_ledge_top_z` | -15.0 | Top of bottom rail = plate bottom face |
-| `throttle_ledge_top_z - rail_h` | -17.0 | Bottom of bottom rail |
-| `-lip_thickness - insert_height` | -23.0 | Bottom of insert (duct end) |
+| `-slat_drop·cos(angle)` | ~-9.2 | Bottom of slat tips (at 49°) |
+| `dividers_bottom_z` | -12.6 | Divider bottoms = throttle plate TOP face = shoulder face |
+| `throttle_ledge_top_z` | -13.8 | Plate BOTTOM face (= shoulder face − plate thickness) |
+| `-lip_thickness - insert_height` | -21.8 | Bottom of insert (duct end) |
+
+(The slide-in rail/channel Z values from the previous design are gone — the
+plate now drops onto the shoulder rather than sliding through a channel.)
 
 ## Zones and Slot Sizing
 
@@ -94,16 +94,24 @@ At the **printable floor** (typically 1–2% open area), the algorithm pins to o
 
 Verified by `directional-vent-test.scad` running across these settings.
 
-## Slide-In Mechanism
+## Drop-On-Shoulder Mechanism
 
-The throttle plate enters the vent body through an **E-side opening** that spans the full Y width of the insert interior (`interior_y = 135.2 mm`) over the 1.4 mm channel Z height.
+The throttle plate **drops into the insert from the duct side** and rests on a shoulder formed by the insert walls. There is no slide-in channel, no rails, no E-side opening, and no W-notch (all removed — see Alternatives Considered).
 
-- **Bottom rail** (`throttle_bottom_rail()`): U-shape on N/S/W walls, protruding inward by `throttle_rail_depth = 2 mm` from each wall. Plate rests on top of it.
-- **Top rail** (`throttle_top_rail()`): U-shape on N/S/W walls at the channel's top. Captures the plate from above.
-- **W-wall notch** (`throttle_w_notch()`): 1.2 mm deep slot in the inside face of the W wall; the plate's W edge seats into this notch for an air seal.
-- **E-side opening** (`throttle_e_opening()`): the E perimeter wall is removed over the channel Z range across the full interior_y. The plate slides in here. Sealed with aluminum duct tape post-installation.
+How the shoulder is formed (`insert_walls()`):
 
-Plate footprint: `throttle_plate_x_total × throttle_plate_y = 241 × 134.8 mm` (insert_outer_x − clearance, by interior_y − 2×clearance).
+- **Upper section** (lip bottom → shoulder, room side of plate): walls thickened inward by `throttle_ledge_width = 3 mm`. The bottom face of this thick section is the **shoulder** the plate seats against. Inner hole here = `insert_outer − 2·insert_wall_thickness − 2·throttle_ledge_width` ≈ **231.4 × 129.4 mm**.
+- **Lower section** (shoulder → insert bottom, duct side of plate): thin walls (`insert_wall_thickness`). Inner cavity here = `insert_outer − 2·insert_wall_thickness` ≈ **237.4 × 135.4 mm** — wider, so the plate drops in from the duct end.
+
+Plate footprint: `throttle_plate_x_total × throttle_plate_y = lower_inner − 2·throttle_clearance` ≈ **236.6 × 134.6 mm**.
+
+This sits in the band between the two inner sizes:
+- **0.4 mm smaller** than the lower cavity per side (`throttle_clearance`) → drops in from the duct.
+- **2.6 mm larger** than the upper shoulder hole per side (`throttle_ledge_width − throttle_clearance`) → seats on the shoulder, cannot fall through.
+
+HVAC aluminum foil tape applied from the duct side spans the plate-edge → lower-wall-inner-face joint, sealing the perimeter and securing the plate. A 15 mm `throttle_tape_margin` band around the plate perimeter is kept slot-free for tape grip.
+
+To swap throttles: peel tape, push the plate down/out the duct side, drop a new one in, re-tape.
 
 ## Material Optimization History
 
@@ -114,7 +122,8 @@ The current design has been optimized for minimum filament. Key reductions:
 | `slat_thickness` | 1.8 mm | **1.2 mm** | Slats anchored at both Y ends + top, 2 perimeters in PETG is plenty |
 | `divider_wall` | 2.4 mm | **1.2 mm** | Dividers are air-seals, not load-bearing; tied at lip & throttle plate |
 | `lip_overhang_short` | 15 mm | **10 mm** | N/S overhang has no mount holes; 10 mm covers ceiling cutout slop |
-| `dividers_bottom_z` | -23 (full depth) | **-13.8** (plate top) | Below plate is undifferentiated duct air; dividers there waste filament |
+| `dividers_bottom_z` | -23 (full depth) | **-12.6** (plate top) | Below plate is undifferentiated duct air; dividers there waste filament |
+| slat support pillars | present | **removed** | Were in-print supports for the 65° slats; at 49° the slats self-support, so the pillars (and the support *they* drew, which clogged the openings) are gone |
 
 Current vent body PETG mass: **~181 g** at 100% volume (real slicer output ~150 g with infill). Throttle: ~49 g.
 
@@ -127,26 +136,29 @@ If you change one of these parameters, expect cascading effects:
 | `insert_width` or `insert_depth` | All Y/X-derived dimensions: interior, lip_outer, throttle plate footprint, opening sizes. Test all four open-area settings after. |
 | `insert_height` | `throttle_ledge_top_z` (via `-lip_thickness - insert_height + throttle_ledge_z_offset`); below-throttle wall remains the same. |
 | `lip_thickness` | All Z values shift by the same delta. |
-| `throttle_ledge_z_offset` | Channel + divider bottom Z shift; slats unaffected. |
-| `fixed_slat_angle` | Slat sweep + body length stay the same, but visual appearance and airflow direction change. Below 50° = mild deflection; above 75° = nearly horizontal slats and printability concerns. |
-| `slat_body_length` | Slat tip depth changes; affects how far slats hang into the air path. |
+| `throttle_ledge_z_offset` | Shoulder + divider bottom Z shift; slats unaffected. |
+| `fixed_slat_angle` | Lateral throw, slat tip depth, and divider-wedge shape change. **Hard cap at ≤ 50° from vertical** — above that the slats stop self-supporting and the slicer clogs the airflow openings with unremovable support. Lower = shallower throw but safer overhang. |
+| `slat_body_length` | Slat tip depth changes; affects how far slats hang into the air path. Must keep slat tips above `dividers_bottom_z` (currently 3.4 mm of clearance at 49°). |
 | `min_printable_slot` | Reduces if nozzle gets smaller; recompute every part's printable-floor message. |
 | `wall` (structural margin, NOT a print wall) | Affects interior dimensions, slot lengths, slat anchoring depth. |
 | `divider_wall` | Only affects divider shell thickness; safe to tune independently. |
-| `insert_wall_thickness` | Affects W-notch outer wall thickness remaining after cut (currently 0.6 mm); going thicker leaves more outer wall, thinner is risky. |
+| `insert_wall_thickness` | Sets both inner cavity sizes, so it moves the throttle plate footprint AND the shoulder seat depth. Larger = thicker walls and a deeper seat. |
+| `throttle_ledge_width` | Shoulder seat depth = `throttle_ledge_width − throttle_clearance` per side. Larger = more bearing for the plate but a smaller upper opening; must stay below the half-zone width so it doesn't intrude on slots. |
+| `throttle_clearance` | Drop-in slop against the lower cavity per side; also reduces the shoulder seat by the same amount. Too large → plate rattles and seat shrinks; too small → won't drop in after PETG shrinkage. |
 
 ## Alternatives Considered and Rejected
 
 These came up during design and were ruled out. Documented here so future agents don't re-propose them:
 
 1. **Open-area solver on slat angle** — produced welded slats at low open-area (≤5%). Replaced by fixed-angle slats + throttle plate.
-2. **Snap-clip retention on throttle plate** (cantilever fingers + groove undercuts in the insert walls) — produced floating-bump geometry that didn't fully manifold; also hard to remove for swapping. Replaced by slide-in + duct tape.
-3. **Finger pull tab on throttle plate** — initially added for grip; redundant once we accepted that the E opening would be taped shut anyway. Removed.
-4. **Snap-in throttle from the duct side (perpendicular insertion)** — required pushing the plate past the slats, which the slats blocked. Replaced by lateral slide-in from the E side.
-5. **Throttle plate ABOVE the slats** (between slats and lip) — would compress airflow into a thin laminar stream emerging right at the room face; mixing/deflection is poorer. Throttle now sits BELOW the slats so the metered jet has the full `insert_height` to develop and hit the slats.
-6. **Dividers running full insert height** — wasted ~18 g of filament below the throttle plate where there's no zone separation needed. Truncated to plate top.
-7. **Smaller `lip_overhang_short` (5 mm)** — too aggressive; relies on a clean ceiling cutout. Settled on 10 mm.
-8. **Thinner `divider_wall` (0.6 mm)** — 1 perimeter at 0.6 nozzle is too flimsy at 130 mm length. 1.2 mm (2 perimeters) is the practical floor.
+2. **Snap-clip retention on throttle plate** (cantilever fingers + groove undercuts in the insert walls) — produced floating-bump geometry that didn't fully manifold; also hard to remove for swapping. Replaced by drop-on shoulder + tape.
+3. **Slide-in throttle from the E side** (top/bottom rails forming a channel, E-wall opening, W-wall notch) — the rails and the E opening left an unsupported wall strip needing support, and the channel was fiddly. Replaced by the drop-on-shoulder mechanism: the plate drops in from the duct side onto a shoulder formed by the two-thickness insert wall. Simpler geometry, no support.
+4. **65° slats + permanent support pillars** — at 65° from vertical the slats overhang past PETG's no-support limit, so permanent 1.2 mm pillars were added between slats to give them something to print onto. But the pillars themselves floated mid-air and drew slicer support, and that support filled the airflow openings and could not be removed (it clogged the vent). Replaced by simply lowering the slat angle to 49° (self-supporting) and deleting the pillars entirely.
+5. **Throttle plate sized off the upper shoulder hole** (`upper_inner − 2·clearance`) — made the plate *smaller* than the shoulder opening, so it fell straight through instead of seating. Fixed by sizing off the lower cavity (`lower_inner − 2·clearance`) so the plate overhangs the shoulder by ~2.6 mm per side. (This was the "plate too small, won't sit on the shoulder" report.)
+6. **Throttle plate ABOVE the slats** (between slats and lip) — would compress airflow into a thin laminar stream emerging right at the room face; mixing/deflection is poorer. Throttle now sits BELOW the slats so the metered jet has the full `insert_height` to develop and hit the slats.
+7. **Dividers running full insert height** — wasted ~18 g of filament below the throttle plate where there's no zone separation needed. Truncated to plate top.
+8. **Smaller `lip_overhang_short` (5 mm)** — too aggressive; relies on a clean ceiling cutout. Settled on 10 mm.
+9. **Thinner `divider_wall` (0.6 mm)** — 1 perimeter at 0.6 nozzle is too flimsy at 130 mm length. 1.2 mm (2 perimeters) is the practical floor.
 
 ## Test Inventory
 
@@ -156,20 +168,25 @@ These came up during design and were ruled out. Documented here so future agents
 |---|---|
 | E | `side_slat_angle == fixed_slat_angle` (no solver) |
 | F | `center_slat_angle == fixed_slat_angle` |
+| F2 | `fixed_slat_angle ≤ 50°` from vertical (self-supporting in PETG; no clogging support) |
 | A | Side throttle open area matches target (or pinned to printable floor) |
 | B | Side throttle slot width ≥ `min_printable_slot` |
 | C | Center throttle open area matches target (or pinned to printable floor) |
 | D | Center throttle slot width ≥ `min_printable_slot` |
 | G | `part` parameter is one of "vent" or "throttle" |
-| J | Bottom rail top Z = `-lip_thickness - insert_height + throttle_ledge_z_offset` |
+| J | Shoulder/plate-bottom Z = `-lip_thickness - insert_height + throttle_ledge_z_offset` |
 | L | Dividers bottom Z = throttle plate top Z (no collision) |
-| M | Plate X length = `insert_outer_x - throttle_clearance` (full neck length, no tab) |
-| N | Plate Y width = `interior_y - 2 × throttle_clearance` (full interior, edges captured by rails) |
-| O | Top rail bottom Z = bottom rail top + channel gap (correct channel height) |
-| P | E opening Z range = channel Z range |
+| M | Plate X = `lower_inner_x - 2 × throttle_clearance` (drops into lower cavity) |
+| M2 | Plate seats on the shoulder by ≥ 1 mm per side (does NOT fall through the shoulder hole) |
+| N | Plate Y = `lower_inner_y - 2 × throttle_clearance` (drops into lower cavity) |
+| O | Plate top Z is flush with dividers' duct-side ends (pneumatic seal) |
+| P | Shoulder inward width (`throttle_ledge_width`) is 1.2–10 mm (supports plate, doesn't block airflow) |
 | Q | `slat_thickness == 1.2 mm` (printable minimum, filament-optimized) |
 | R | `divider_wall == 1.2 mm` (printable minimum, filament-optimized) |
 | S | `lip_overhang_short == 10 mm` (filament-optimized while still covering cutout slop) |
+| W | Throttle slots respect the 15 mm tape-margin band around the plate perimeter |
+
+(Tests T and V — slat support pillars — were removed when the pillars were deleted.)
 
 Run via:
 
@@ -181,7 +198,7 @@ Tests are also run across open-area settings 0.01, 0.05, 0.10, 0.25 to verify th
 
 ## Known Print Issues
 
-- **Support needed** for an 1.8 × 5 × 135 mm strip of E perimeter wall above the throttle channel opening. The strip starts at z=-15 (top of channel) with no material below to print on. Bambu Studio auto-detects; the support sits inside the duct cavity and is easy to peel off.
+- **No supports needed.** The previous design needed support in two places (a strip of E perimeter wall above the slide-in opening, and under the 65° slats via permanent pillars). Both are gone: the slide-in mechanism was replaced by drop-on-shoulder (no E opening), and the slats were lowered to 49° (self-supporting). If you raise `fixed_slat_angle` above 50°, the slicer will start filling the airflow openings with support that you cannot remove — Test F2 guards against this.
 
 ## When Modifying
 
