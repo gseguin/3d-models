@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Parametric OpenSCAD models for FDM printing on a Bambu H2D (0.6 mm nozzle, PETG). Printable parts live in `src/parts/`; its `AGENTS.md` holds the part workflow, test conventions, and print limits. `src/lib/` (shared modules) and `src/assemblies/` (multi-part assemblies) are reserved and empty.
+Parametric OpenSCAD models for FDM printing. Printable parts live in `src/parts/`; its `AGENTS.md` holds the part workflow, test conventions, and print limits. `src/lib/` (shared modules) and `src/assemblies/` (multi-part assemblies) are reserved and empty.
 
 ## Conventions
 

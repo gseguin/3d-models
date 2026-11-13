@@ -44,12 +44,14 @@ Top-level `assert()` statements in `<part>-test.scad`; OpenSCAD itself is the ru
 
 `// ----------` rule lines separate logical sections. Parameters group under `// [Section Name]` headers, which the Customizer shows as tabs. Print settings sit in a `Print settings:` comment block at the top of each file.
 
-## Print limits (H2D, 0.6 mm nozzle, PETG)
+## Print limits
 
-- Walls in 0.6 mm multiples: 1.2 (2 perimeters), 1.8 (3), 2.4 (4).
-- Narrowest printable slot: ~1.2 mm.
+Limits scale with nozzle diameter `n`; a part's `Print settings:` block names the nozzle it was designed for and the filaments it recommends.
+
+- Walls in multiples of `n`: 2n (2 perimeters) is the practical floor.
+- Narrowest printable slot: ~2n.
 - Longest clean bridge: ~40 mm.
 - Unsupported overhang: up to ~50° from vertical.
-- Layer height: 0.32 mm typical (0.3–0.4 mm range).
+- Layer height: ~0.5n typical (0.5n–0.67n range).
 - Brim: 4–6 mm on wide flanges (>200 mm).
 - Design support-free; a part that needs supports names where in its header comment.
