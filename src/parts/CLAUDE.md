@@ -12,6 +12,9 @@ Guidance for working in this directory (OpenSCAD source for individual printable
 | `directional-vent.md` | Design contract: constraints, decisions, alternatives ruled out, change-impact map. **Read this before modifying `directional-vent.scad`.** |
 | `gf-silverware-bin.scad` | (Standalone part — no design doc yet.) |
 | `h2d-pen-adapter.scad` | (Standalone part — no design doc yet.) |
+| `snapware-lid-holder.scad` | Under-shelf ladder rack for Snapware lids; Costco set presets, auto-split into interlocking pieces. See `snapware-lid-holder.md`. |
+| `snapware-lid-holder.json` | Customizer sets: the older and newer Costco sets as measured, plus "New set 1". |
+| `snapware-lid-holder-test.scad` | Assertion tests A–S (preset counts, exact stops, hook in front of each stop, clamp ends on hooks, nothing behind a stop, hook gap ≤ clamp contact, bed fit, joints, weight-balanced intermediate screws). |
 
 When adding a new part with non-trivial geometry, follow the **directional-vent pattern**:
 1. `<part>.scad` — the model, with multi-part dispatch if needed.
