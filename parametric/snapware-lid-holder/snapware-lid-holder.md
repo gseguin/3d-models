@@ -18,8 +18,12 @@ shelf for the current set), and slides in from the front until it hits its stop.
   long as its clamp needs. The
   lid's rear quarter hangs out past the rail. "Lid end" puts the stop at the
   lid edge instead.
-- **Clamp held by two hooks at rest.** One entrance hook sits under the front
-  end of the earliest clamp. Each size gets a stop hook under its clamp's rear
+- **Clamp held by two hooks at rest.** One entrance hook sits as far back as
+  every clamp allows: it ends `Clamp_min_engagement` past the latest clamp
+  front, so it carries every size's clamp front (placed under the earliest
+  clamp front instead, the medium squares needed a hook of their own at Z 72
+  on the Newer set). It falls back to the earliest clamp front when no such
+  spot exists. Each size gets a stop hook under its clamp's rear
   end. A size gets its own clamp-front hook only if its clamp would otherwise
   rest on no hook besides its stop hook (≥ `Clamp_min_engagement` overlap);
   the continuous ledge rail carries the clamp in between. Per-size front
@@ -56,7 +60,7 @@ shelf for the current set), and slides in from the front until it hits its stop.
 - **Minimum filament.** The full channel profile exists only at short
   crossbar stations. Lids are light, stiff panels.
 - Channel cross-section is the user-supplied `Big+Rectangle+2.stl` profile
-  (20 × 30), scaled by `Channel_pitch`/`Channel_depth`. Fit not yet validated.
+  (20 × 30), scaled by `Channel_pitch`/`Channel_depth`. Fit validated: racks for both Costco sets printed and installed.
 - **Roof** (shelf side, over the lid cavities and voids) is `Roof_thickness`
   3.6 mm (6 perimeters; the source profile has 5). It is thinned from below,
   so the shelf face, the joint socket caps (2.4 mm) and the boss screw seats
@@ -136,13 +140,17 @@ shelf for the current set), and slides in from the front until it hits its stop.
   width and moves lids to more pieces if needed. Current set: columns after
   lids 2 and 6 of the 10-lid piece (+12.8 mm).
 - **Left trim** (single-piece racks): a full hook drops the lids left of a
-  screw column that don't need it (it isn't their stop hook, their hook gap
-  stays ≤ `max_gap`, the shortest clamp's limit, without it; the lid's own
-  `gap_max` allowed a 75 mm gap under the long lids on the Older set, and their clamp still rests on another hook
-  besides the stop hook). The column screw's tube becomes that hook's left
-  end. Decided rear hooks first. Current set: the lids 3–5 stop hook
-  (Z 123) starts at column 2 instead of lid 0. Not done on multi-piece racks,
-  where a piece's left edge may be a joint.
+  screw column that don't need it. A lid needs a hook if it is its stop hook,
+  if its clamp would no longer rest on another hook besides the stop hook, or
+  if its largest clear gap would exceed `trim_gap` = ⅔ of its clamp (at least
+  `max_gap`, at most its own clamp's limit), so long lids keep a middle hook.
+  Calibrated on the user's calls: 102 mm under a 117 mm clamp and 75 mm under
+  108 mm were too wide, 52 mm under 82 mm was fine. Tried: `max_gap` alone
+  (kept hooks long lids didn't need) and each lid's own clamp (left long lids
+  only end hooks). Hooks can only end at a column (the end tube would
+  otherwise stand in the next lid's path). The column screw's tube becomes
+  the hook's left end. Decided rear hooks first. Not done on multi-piece
+  racks, where a piece's left edge may be a joint.
 - **Joints**: at each station shared by neighbouring pieces, piece *k*'s right
   boss is shortened by `Socket_cap` ("male"), and piece *k+1* has a C-socket
   wrapping it. The socket's cap sits between the boss and the shelf, so one screw

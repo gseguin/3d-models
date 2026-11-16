@@ -2,7 +2,7 @@
 
 An under-shelf rack that hangs Snapware Total Solution plastic lids vertically, one lid per channel. Every channel prints side by side in one piece, so spacing and parallelism come from the print. A selection wider than the bed splits into pieces that join with knuckle joints. Pieces screw to the shelf through countersunk bosses.
 
-Status: prototype, fit not yet validated. Lid lengths are estimates from retailer container dimensions, so measure your lids and override them.
+Status: validated. Racks for both the "Newer Costco set" and "Older Costco set" have been printed and installed under a shelf. The default lid lengths are still estimates from retailer container dimensions, so measure your own lids and override them if they differ.
 
 ## Configuration
 

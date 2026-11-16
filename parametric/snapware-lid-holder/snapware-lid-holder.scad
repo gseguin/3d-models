@@ -1,4 +1,4 @@
-// Parametric Snapware Lid Holder, v4. Units: mm. Prototype; fit not validated.
+// Parametric Snapware Lid Holder, v4. Units: mm. Fit validated: both Costco sets printed and installed.
 // Hangs Snapware Total Solution plastic lids vertically under a shelf, one lid
 // per channel, all channels side by side in ONE printed piece so spacing and
 // parallelism come from the print. If the selection is wider than the bed it
@@ -320,8 +320,14 @@ sizes = dedup([for (c = channels) [c[0], c[2]]]);
 function ch_of(key) = [key[0], 0, key[1]];
 // Entrance hook under the front end of the earliest clamp, plus each size's
 // clamp-rear and stop hooks.
+// It sits as far back as every clamp allows (ending Clamp_min_engagement past
+// the latest clamp front, starting that much before the earliest clamp rear),
+// so it carries every size's clamp front and no extra front hooks are needed.
 cf_min = min([for (key = sizes) max(0, clamp_span(ch_of(key))[0])]);
-base_reqs = concat([[cf_min, cf_min + SL, 0, cf_min + SL, []]],
+cf_max = max([for (key = sizes) max(0, clamp_span(ch_of(key))[0])]);
+cr_min = min([for (key = sizes) clamp_span(ch_of(key))[1]]);
+cf_z = let(z = cf_max + Clamp_min_engagement - SL) z > cf_min && z <= cr_min - Clamp_min_engagement - SL ? z : cf_min;
+base_reqs = concat([[cf_z, cf_z + SL, 0, cf_z + SL, []]],
   [for (key = sizes) let(ch = ch_of(key), cs = clamp_span(ch), cf = max(0, cs[0]), r = stop_z(ch))
     each [[max(cf, cs[1] - SL), cs[1], r, cs[1], [key]], [max(cf, r - Stop_thickness - SL), r + Stop_tail, r, r, [key]]]]);
 all_rails = [for (c = channels) rail(c)];
@@ -421,18 +427,23 @@ function piece_mounts(pc) = [for (st = piece_stations(pc)) if (st[5]) st];
 // Left trim (single-piece racks): a full hook's lids left of a screw column
 // that don't need it are dropped, and the column screw ends the hook (like
 // any end tube). A lid needs hook st if it holds its stop, if dropping it
-// would leave a clear gap > max_gap (shortest clamp of the set, not the
-// lid's own: long lids would sag across a wide gap) between that lid's hooks, or if the clamp
+// would leave a clear gap > trim_gap between that lid's hooks, or if the clamp
 // at rest would no longer rest on a hook besides its stop hook. Decided back
 // to front (rear hooks first): each check uses the hooks kept so far behind
 // and all in front.
+// Largest clear gap a lid may be left with after a trim: 2/3 of its clamp
+// (at least the set's max_gap, at most its own clamp's limit). Long lids then
+// keep a middle hook: 102 mm under a 117 mm clamp (Newer large rectangles)
+// and 75 mm under a 108 mm one (Older medium rectangles) were too wide;
+// 52 mm under an 82 mm clamp was fine.
+function trim_gap(c) = min(gap_max(c), max(max_gap, 2*c[2]/3));
 function needs(pc, sts, i, k) = let(st = sts[i], r = rail(pc[k]), cs = clamp_span(pc[k]),
     others = [for (j = [0:len(sts)-1]) if (j != i && member(pc, sts[j], k)) [sts[j][0], seg_end(pc, sts[j], k)]],
     prv = max(concat([-1e9], [for (o = others) if (o[1] <= st[0] + eps) o[1]])),
     nxt = min(concat([1e9], [for (o = others) if (o[0] >= st[1] - eps) o[0]])),
     held = [for (o = others) if (!(o[0] <= cs[1] - SL + eps && o[1] >= cs[1] - eps))
             if (min(o[1], cs[1]) - max(o[0], cs[0]) >= Clamp_min_engagement - eps) 1])
-  r <= st[1] + eps || (prv > -1e8 && nxt < 1e8 && nxt - prv > max_gap + eps) || len(held) == 0;
+  r <= st[1] + eps || (prv > -1e8 && nxt < 1e8 && nxt - prv > trim_gap(pc[k]) + eps) || len(held) == 0;
 function trims(pc, sts, i = undef) = let(i0 = i == undef ? len(sts) - 1 : i) i0 < 0 ? [for (st = sts) len(st) > 6 ? st[6] : 0] :
   let(st = sts[i0],
       cand = i0 == 0 || !st[3] || n_pieces > 1 || fit ? 0 :
