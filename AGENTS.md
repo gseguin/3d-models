@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Parametric OpenSCAD models for FDM printing. Printable parts live in `src/parts/`; its `AGENTS.md` holds the part workflow, test conventions, and print limits. `src/lib/` (shared modules) and `src/assemblies/` (multi-part assemblies) are reserved and empty.
+Parametric OpenSCAD models for FDM printing. Each model lives in its own directory, `parametric/<part>/`. Read `parametric/AGENTS.md` for the part workflow, test conventions, and print limits before touching any part.
 
 ## Conventions
 
@@ -9,6 +9,8 @@ Parametric OpenSCAD models for FDM printing. Printable parts live in `src/parts/
 - Parameters carry Customizer annotations (`// [a, b, c]` dropdown, `// [0:0.1:1]` slider); concrete parameter sets go in a sibling `<part>.json`.
 
 ## Render and test
+
+Run from the part's directory:
 
 ```bash
 openscad -o <part>.stl <part>.scad                                # defaults
@@ -21,4 +23,4 @@ Precedence: `-D` beats the `.json` set, which beats the `.scad` default.
 
 ## Commits
 
-Conventional Commits, scoped by part name: `feat(directional-vent): add slide-in throttle plate`.
+Conventional Commits, scoped by part name: `feat(directional-vent): add slide-in throttle plate`. Repo-wide changes go unscoped: `docs: ...`, `refactor: ...`.

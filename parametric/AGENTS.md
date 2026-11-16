@@ -1,21 +1,27 @@
-# src/parts/AGENTS.md
+# parametric/AGENTS.md
 
-One printable part per `<part>.scad`. A part with non-trivial geometry ships as four files:
+One directory per printable part: `parametric/<part>/`. A part with non-trivial geometry holds:
 
 1. `<part>.scad`: the model.
 2. `<part>.json`: Customizer parameter sets.
 3. `<part>-test.scad`: geometric assertions.
 4. `<part>.md`: the **design contract**: constraints, decisions, alternatives ruled out, change-impact map.
+5. `README.md`: the human-facing summary: what the part is, its outputs, how to print it.
+6. `AGENTS.md` (plus a `CLAUDE.md` holding `@AGENTS.md`): what is specific to this part: its production set, its modes, its gotchas.
 
-`directional-vent` is the reference example. In `directional-vent.json`, "New set 1" is the current production print; run its tests against that set.
+`directional-vent/` is the reference example.
 
 ## Modifying a part
 
-1. Read the part's design contract (`<part>.md`) first, when one exists.
+1. Read the part's `AGENTS.md`, then its design contract (`<part>.md`) when one exists.
 2. Make the minimal change.
 3. Run `<part>-test.scad`. When an invariant changes on purpose, update its test in the same change.
 4. Re-render the default part and every set in `<part>.json`. Done when each one renders cleanly.
-5. Bring `<part>.md` in line with the new state whenever the change touches a constraint, decision, or the change-impact map.
+5. Bring `<part>.md`, `README.md`, and the part's `AGENTS.md` in line with the new state whenever the change touches a constraint, a decision, the change-impact map, an output, or a print setting.
+
+## Adding a part
+
+Create `parametric/<part>/` with at least `<part>.scad`, `README.md`, `AGENTS.md`, and `CLAUDE.md`. Add the test file and design contract once the geometry carries invariants worth guarding.
 
 ## Multi-part dispatch
 
@@ -33,7 +39,7 @@ Render a non-default part with `openscad -D 'part="throttle"' -o throttle.stl di
 
 ## Tests
 
-Top-level `assert()` statements in `<part>-test.scad`; OpenSCAD itself is the runner, and a failed assert exits non-zero with the failing assertion on stderr.
+Top-level `assert()` statements in `<part>-test.scad`, which `include`s the model from the same directory; OpenSCAD itself is the runner, and a failed assert exits non-zero with the failing assertion on stderr.
 
 - One test per geometric invariant (slat angle, plate dimensions, channel Z, ...).
 - Letter-prefix each label (`A:`, `B:`, ...) so messages can cite it.
