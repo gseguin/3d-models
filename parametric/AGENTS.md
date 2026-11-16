@@ -50,6 +50,10 @@ Top-level `assert()` statements in `<part>-test.scad`, which `include`s the mode
 
 `// ----------` rule lines separate logical sections. Parameters group under `// [Section Name]` headers, which the Customizer shows as tabs. Print settings sit in a `Print settings:` comment block at the top of each file.
 
+## Minimum material
+
+Design every part *lean*: the least plastic that keeps it structurally sound in use. Each solid region earns its volume by carrying a load, locating or sealing a mating part, or keeping the print stable on the bed. A region that does none of these becomes a void, a cutout, or a thinner wall. Size walls and ribs to the load path, down to the floors in Print limits. A change that adds material names, in the design contract, the load or function the material serves.
+
 ## Print limits
 
 Limits scale with nozzle diameter `n`; a part's `Print settings:` block names the nozzle it was designed for and the filaments it recommends.
