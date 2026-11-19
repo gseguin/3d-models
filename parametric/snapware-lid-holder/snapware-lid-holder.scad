@@ -1,4 +1,5 @@
-// Parametric Snapware Lid Holder, v4. Units: mm. Fit validated: both Costco sets printed and installed.
+// Parametric Snapware Lid Holder, v5 (lean). Units: mm. Channel fit validated on v4 (both Costco sets
+// printed and installed); the v5 short hooks and hollow pillars are not print-validated yet.
 // Hangs Snapware Total Solution plastic lids vertically under a shelf, one lid
 // per channel, all channels side by side in ONE printed piece so spacing and
 // parallelism come from the print. If the selection is wider than the bed it
@@ -19,14 +20,18 @@
 //  - Stop hooks and gap fills are screwed at both ends through vertical
 //    countersunk bosses (driver goes up the boss bore); clamp-front hooks of
 //    longer lids are webbed at roof level to the nearest screwed hook.
+//  - Lean: hooks are only Station_length long (plus the stop wall) and grow to
+//    one screw-tube diameter just at the pillars that hold a screw; every
+//    pillar is a hollow box (Void_wall walls) with a pocket in its foot.
 //  - Prints without supports in PETG or PLA: only short bridges (cavity
-//    roofs ~7 mm, webs/step-boss bridges < 6 mm, socket caps ~13 mm).
+//    roofs ~7 mm, pillar voids ~9 mm, webs/step-boss bridges < 6 mm, socket
+//    caps ~13 mm).
 //
 // Axes (mounted): X across channels, Y down from shelf (Y=0 on shelf), Z along
 // lid insertion; open front at Z=0, each size's stop at Z = its lid length.
 // Print settings: PRINT FLAT, OPEN SIDE DOWN (roof up) - this is what the
 // "Print" output produces. No supports (PETG or PLA). Roof bridges the ~7 mm
-// channel cavity; boss seats bridge their bore. Wall multiples of 0.6 mm. Brim optional.
+// channel cavity and the ~9.5 mm pillar voids; boss seats bridge their bore. Wall multiples of 0.6 mm. Brim optional.
 //
 // Counts are catalog facts (sources below); lid lengths are ESTIMATES from
 // retailer container dimensions - measure your lids and override.
@@ -128,8 +133,12 @@ Stop_thickness = 2.4;
 // Hook length behind the stop wall (0 = the piece ends at the wall; the clamp
 // only touches the Station_length in front of it).
 Stop_tail = 0;
-// Length of each crossbar station along Z.
-Station_length = 10;
+// Length of each crossbar station along Z (the hook under the clamp; must be
+// >= Clamp_min_engagement). Pillars that hold a screw stay one tube long.
+Station_length = 6;
+// Walls around the lightening voids in each pillar (3 perimeters at 0.6 mm;
+// 1.2 is the printable floor).
+Void_wall = 1.8;
 // Each channel's rail ends this far short of its lid's clamp edge.
 Front_overhang = 0;
 Clamp_min_engagement = 5;
@@ -142,7 +151,7 @@ Lead_in = 0;
 // full rail length: the clamp rides on it all the way in (cannot droop and
 // miss the next station) and it ties the stations together.
 Strip_width = 2.4;
-// Fit coupon gap = max hook gap minus this (default 50 - 5 = 45 mm).
+// Fit coupon gap = max hook gap minus this (default 44 - 5 = 39 mm).
 Fit_test_gap_margin = 5;
 Max_mount_spacing = 200;
 Mount_thickness = 5;
@@ -226,7 +235,9 @@ fit_gap = max_gap - Fit_test_gap_margin;
 // Each lid only has to bridge the gaps along its own channel: its own clamp
 // sets its limit, so a short clamp doesn't add hooks behind its stop.
 function gap_max(c) = c[2] - 2*Clamp_min_engagement;
-fit_rail = Station_length + fit_gap + Station_length + Stop_thickness;
+// The coupon's front hook is long enough for the whole clamp to sit on the coupon.
+fit_front = max(Station_length, 2*Clamp_min_engagement + Fit_test_gap_margin - Station_length);
+fit_rail = fit_front + fit_gap + Station_length + Stop_thickness;
 // Channel record [lid length L, size index, clamp length C]. Sorted by stop
 // depth (deepest left), ties by lid length, so the rear edge is a staircase.
 function stop_key(c) = Stop_thickness + (clamp_mode ? (c[0] + c[2])/2 : c[0]) - Front_overhang;
@@ -385,7 +396,7 @@ function sort_z(v) = len(v) <= 1 ? v :
 function build(rq) = let(ss = seg_sts_of(union_iv(qsort_lo(rq))),
   sv = solve([for (st = ss) if (st[3]) st], [for (st = ss) if (!st[3]) st]))
   sort_z(concat(pick(sv[0]), sv[1]));
-stations0 = build(fit ? [[0, SL, 0, SL, []], [fit_rail - Stop_thickness - SL, fit_rail + Stop_tail, 0, fit_rail, []]] : base_reqs);
+stations0 = build(fit ? [[0, fit_front, 0, fit_front, []], [fit_rail - Stop_thickness - SL, fit_rail + Stop_tail, 0, fit_rail, []]] : base_reqs);
 // A size gets its own clamp-front hook only if, at rest, its clamp would not
 // otherwise sit on another hook (entrance, a shallower stop hook or a gap
 // fill) by at least Clamp_min_engagement besides its own stop hook.
@@ -396,17 +407,20 @@ extra_reqs = fit ? [] : [for (key = sizes) if (!second_hook(key)) let(cf = max(0
   [cf, cf + SL, stop_z(ch_of(key)), cf + SL, [key]]];
 reqs = concat(base_reqs, extra_reqs);
 stations1 = len(extra_reqs) == 0 ? stations0 : build(reqs);
-// Screwed hooks are made at least one boss diameter long when the rack has
-// screw columns, so the column tube (cut flush with the hook faces) keeps a
-// Boss_wall in front of and behind its driver bore. They grow forward, never
-// into the previous hook.
-any_cols = len([for (pc = pieces) if (len(cols(pc)) > 0) 1]) > 0;
+// Screwed hooks are made at least one boss diameter long, so every screw tube
+// (cut flush with the hook faces at a column) keeps a Boss_wall in front of
+// and behind its driver bore. They grow forward, never into the previous
+// hook. Only the pillars that hold a screw are built that long (see
+// hook_relief); the rest of the hook keeps its own front, hz0, which is what
+// the clamp rides on and what every gap rule measures.
 function lengthen(v, k = 0, prev_end = -1e9) = k >= len(v) ? [] :
   let(st = v[k], e = min(st[4][0][3], st[2]),
-      z0 = st[5] && any_cols && e - st[0] < 2*boss_r ? max(0, prev_end, e - 2*boss_r) : st[0],
-      n = [z0, st[1], st[2], st[3], [[z0, st[4][0][1], st[4][0][2], st[4][0][3], st[4][0][4]]], st[5]])
+      z0 = st[5] && !fit && e - st[0] < 2*boss_r ? max(0, prev_end, e - 2*boss_r) : st[0],
+      n = [z0, st[1], st[2], st[3], [[z0, st[4][0][1], st[4][0][2], st[4][0][3], st[4][0][4], st[0]]], st[5]])
   concat([n], lengthen(v, k + 1, st[1]));
 stations = lengthen(stations1);
+// Front of a hook's body (its front before lengthen).
+function hz0(st) = len(st[4][0]) > 5 ? st[4][0][5] : st[0];
 mount_sts = [for (st = stations) if (st[5]) st];
 // Channels (from the left) spanned by a station.
 // Channel k is on station st: full stations take every channel whose rail
@@ -438,7 +452,7 @@ function piece_mounts(pc) = [for (st = piece_stations(pc)) if (st[5]) st];
 // 52 mm under an 82 mm clamp was fine.
 function trim_gap(c) = min(gap_max(c), max(max_gap, 2*c[2]/3));
 function needs(pc, sts, i, k) = let(st = sts[i], r = rail(pc[k]), cs = clamp_span(pc[k]),
-    others = [for (j = [0:len(sts)-1]) if (j != i && member(pc, sts[j], k)) [sts[j][0], seg_end(pc, sts[j], k)]],
+    others = [for (j = [0:len(sts)-1]) if (j != i && member(pc, sts[j], k)) [hz0(sts[j]), seg_end(pc, sts[j], k)]],
     prv = max(concat([-1e9], [for (o = others) if (o[1] <= st[0] + eps) o[1]])),
     nxt = min(concat([1e9], [for (o = others) if (o[0] >= st[1] - eps) o[0]])),
     held = [for (o = others) if (!(o[0] <= cs[1] - SL + eps && o[1] >= cs[1] - eps))
@@ -503,8 +517,25 @@ for (pc = pieces) assert(piece_length(pc) + sock_ro <= max_print_depth + eps, st
 
 // ---------- 2D profile ----------
 source_outline=[[7.0, 5.0], [10.41209, 5.0], [10.89593, 5.05941], [11.35103, 5.2341], [11.75035, 5.51371], [12.07017, 5.88161], [12.29148, 6.31596], [17.87938, 21.66861], [18.0, 22.35265], [18.0, 24.0], [17.93185, 24.51764], [17.73205, 25.0], [17.41421, 25.41421], [17.0, 25.73205], [16.51764, 25.93185], [16.0, 26.0], [10.5, 26.0], [10.0, 26.5], [10.0, 29.5], [10.5, 30.0], [20.17157, 30.0], [20.68921, 29.93185], [21.17157, 29.73205], [21.58579, 29.41421], [24.41421, 26.58579], [24.73205, 26.17157], [24.93185, 25.68921], [25.0, 25.17157], [25.0, 1.0], [4.23607, 1.0], [3.6099, 0.93393], [3.01132, 0.73861], [2.46669, 0.42267], [2.0, 0.0], [0.0, -0.0], [0.0, 29.0], [1.0, 30.0], [4.0, 30.0], [5.0, 29.0], [5.0, 7.0], [5.06815, 6.48236], [5.26795, 6.0], [5.58579, 5.58579], [6.0, 5.26795], [6.48236, 5.06815]];
-source_voids=[[[21.95799, 5.3103], [22.0, 5.5], [22.0, 18.45905], [21.86187, 18.80409], [21.52379, 18.95848], [21.17257, 18.83693], [21.03015, 18.63006], [16.31345, 5.67101], [16.28757, 5.43474], [16.45362, 5.12408], [16.78329, 5.0], [21.5, 5.0], [21.75, 5.06699]]];
-module source_cell() difference() { polygon(source_outline); for (h = source_voids) polygon(h); }
+// Lightening voids of a pillar (source coords): the pillar is a hollow box.
+// Main void: Void_wall from the slanted cavity wall and from the next slot's
+// face, from the roof down to Y 19. Foot pocket below it (X >= 20.3, right of
+// the column foot stretch), Void_wall from the bed and the bottom chamfer.
+// Both are bridged when printed (roof up): ~9.5 mm and ~3 mm.
+vw = Void_wall / sx;
+assert(Void_wall >= 1.2 - eps && vw <= 2.2, "Void_wall must be 1.2 .. 2.2*Channel_pitch/20");
+void_m = (17.87938 - 12.29148)/(21.66861 - 6.31596);   // cavity wall slope dx/dy
+// The main void's top is the thinned roof line itself, so whatever is built
+// from this shape (the column tube's fill) reaches the roof.
+module source_void_shapes() {
+  x0 = 12.29148 + vw*sqrt(1 + void_m*void_m); xr = 25 - vw; yb = 19; yt = min(5, Roof_thickness/sy);
+  polygon([[x0, yt], [xr, yt], [xr, yb], [x0 + (yb - 6.31596)*void_m, yb], [x0, 6.31596]]);
+  intersection() {
+    translate([20.3, yb + vw]) square([xr - 20.3, 30 - 2*vw - yb]);
+    polygon([[0, 0], [51 - vw*sqrt(2), 0], [0, 51 - vw*sqrt(2)]]);   // bottom chamfer is x + y = 51
+  }
+}
+module source_cell() difference() { polygon(source_outline); source_void_shapes(); }
 // Roof thinning (source coords): the cavity and void tops (Y 5) raised to
 // the Roof_thickness line, within the cell's X 0..25.
 roof_s = Roof_thickness / sy;
@@ -512,7 +543,7 @@ assert(Roof_thickness >= 1.2 && roof_s <= 5 + eps, "Roof_thickness must be 1.2 .
 module roof_cut() if (roof_s < 5 - eps) intersection() {
   translate([0, roof_s]) square([25, 8 - roof_s]);   // covers the rounded cavity corners (to Y 7)
   minkowski() {
-    union() { difference() { translate([-1, 1.5]) square([27, 40]); polygon(source_outline); } for (h = source_voids) polygon(h); }
+    union() { difference() { translate([-1, 1.5]) square([27, 40]); polygon(source_outline); } source_void_shapes(); }
     translate([0, -(5 - roof_s)]) square([0.01, 5 - roof_s]);
   }
 }
@@ -531,9 +562,13 @@ module channel_section(n) difference() {
   }
 }
 // Lid space of each channel (used for lead-in chamfers).
-module cavity(n) intersection() {
-  difference() { translate([-1, -1]) square([core_width(n)+2, d+2]); channel_section(n); }
-  for (k = [0:n-1]) translate([k*p + 5*sx, 0]) square([13*sx, d + 1]);
+module cavity(n) difference() {
+  intersection() {
+    difference() { translate([-1, -1]) square([core_width(n)+2, d+2]); channel_section(n); }
+    for (k = [0:n-1]) translate([k*p + 5*sx, 0]) square([13*sx, d + 1]);
+  }
+  // The pillar voids reach left of X 18: they are not lid space.
+  for (k = [0:n-1]) translate([k*p, 0]) scale([sx, sy]) offset(delta = 0.02) source_void_shapes();
 }
 
 // ---------- 3D parts (mounted coordinates) ----------
@@ -581,7 +616,7 @@ function qsort_desc_v(v) = len(v) <= 1 ? v : let(pv = v[floor(len(v)/2)])
 // Y 26), running from the first hook to that channel's stop.
 ledge_top = 26*sy;
 rail_x = 10*sx + Lead_in + Strip_width/2;
-module strips(pc) let(z0 = piece_stations(pc)[0][0]) for (k = [0:len(pc)-1])
+module strips(pc) let(z0 = hz0(piece_stations(pc)[0])) for (k = [0:len(pc)-1])
   translate([k*p + rail_x - Strip_width/2, ledge_top, z0]) cube([Strip_width, d - ledge_top, stop_z(pc[k]) - z0]);
 // Vertical screw boss; top = Y of its shelf-side face (Socket_cap for a male joint boss).
 module boss_solid(top) translate([0, top, 0]) rotate([-90, 0, 0]) cylinder(r = boss_r, h = d - top);
@@ -613,7 +648,30 @@ module socket_solid() difference() {
 function is_male(pc, st, nxt) = span(pc, st) == len(pc) && span(nxt, st) > 0;
 function station_stops(pc, st) = !st[3] ? [] :
   [for (k = [0:len(pc)-1]) let(r = rail(pc[k])) if (r > st[0] + eps && r <= st[1] + eps) [k, stop_z(pc[k]), r]];
-module piece_core(pc, left, right, nxt, skip = []) {
+// Part of a pillar kept one tube long where it holds a screw (source coords,
+// pillar after channel i at X i*p; i = -1 is the piece's left wall). Its left
+// edge runs through the roof, then through the cavity's air 1 mm off the
+// slanted wall, and cuts the ledge at X 17; the right edge stops at the next
+// slot's roof fillet, so no roof overhangs.
+pillar_keep = [[11, -5], [11, 5.5], [16.88, 21.67], [17, 24], [17, 40], [26.8, 40], [26.8, -5]];
+// Cut that shortens screwed hook f (over n channels) to its body front hz0,
+// except at the pillars in longs. Two long pillars in a row keep the cell
+// between them (no notch in a one-lid hook).
+module hook_relief(n, f, longs) translate([0, 0, f[0] - eps])
+  linear_extrude(height = hz0(f) - f[0] + eps, convexity = 12) difference() {
+    translate([-1, -1]) square([core_width(n) + 2, d + 2]);
+    for (i = longs) translate([i*p, 0]) scale([sx, sy]) {
+      polygon(pillar_keep);
+      if (len([for (j = longs) if (j == i + 1) 1]) > 0) translate([26, -5]) square([12, 45]);
+    }
+  }
+// lcol / rcol: the group has a screw column on its left / right.
+module piece_core(pc, left, right, nxt, skip = [], lcol = false, rcol = false) {
+  // Pillars of screwed hook f that hold a screw tube (or a joint socket).
+  function longs(f) = let(sp = span(pc, f)) concat(
+    (left != "none" || lcol) && member(pc, f, 0) ? [-1] : [],
+    right != "none" && (sp < len(pc) || right == "boss") ? [sp - 1] : [],
+    rcol && member(pc, f, len(pc) - 1) ? [len(pc) - 1] : []);
   function live(f) = len([for (z = skip) if (abs(z - f[0]) < eps) 1]) == 0;
   fs = [for (f = piece_stations(pc)) if (live(f)) f];
   ms = [for (f = piece_mounts(pc)) if (live(f)) f];
@@ -621,11 +679,14 @@ module piece_core(pc, left, right, nxt, skip = []) {
   difference() {
     union() {
       for (f = fs) let(rs = runs([for (k = [0:len(pc)-1]) if (member(pc, f, k)) [k, seg_end(pc, f, k)]])) {
-        for (r = rs) station_range(r[0], r[1] + 1, f[0], r[2],
-                                   [for (sk = station_stops(pc, f)) if (sk[0] >= r[0] && sk[0] <= r[1] && abs(sk[2] - r[2]) < eps) sk]);
+        difference() {
+          for (r = rs) station_range(r[0], r[1] + 1, f[0], r[2],
+                                     [for (sk = station_stops(pc, f)) if (sk[0] >= r[0] && sk[0] <= r[1] && abs(sk[2] - r[2]) < eps) sk]);
+          if (f[5] && hz0(f) > f[0] + eps) hook_relief(len(pc), f, longs(f));
+        }
         // Unscrewed station: roof-level web to the nearest screwed one, only
         // over channels on both (so never behind a stop).
-        if (!f[5]) let(b = anchor(pc, f), a = b[0] < f[0] ? min(b[1], b[2]) : f[1], z = b[0] < f[0] ? f[0] : b[0])
+        if (!f[5]) let(b = anchor(pc, f), a = b[0] < f[0] ? min(b[1], b[2]) : f[1], z = b[0] < f[0] ? f[0] : hz0(b))
           if (z > a && live(b)) for (k = [0:len(pc)-1]) if (member(pc, f, k) && member(pc, b, k))
             translate([k*p, 0, a - eps]) cube([p + 5*sx, Roof_thickness, z - a + 2*eps]);
       }
@@ -658,11 +719,11 @@ function col_x(pc, b) = ch_x(pc, b - 1) + 18*sx + Step_clearance + boss_r;
 function col_screws(pc, st) = [for (b = cols(pc)) if (kept(pc, st, b - 1) || (st[5] && kept(pc, st, b))) b];
 
 // 2D profile of the pillar at column b (piece coords): a regular divider
-// pillar widened by col_extra. The cross-section at source X 23 (solid
-// divider, between the void and the bottom chamfer) is stretched across the
-// column, and the rest is shifted so it ends at lid b's slot like every other
-// pillar. Lid b-1's void stays whole, so the pillar is just a fatter one.
-col_xs = 23*sx;   // in the solid divider, right of the void (X 16.3..22): voids keep their shape
+// pillar widened by col_extra. The cross-section mid-way through the solid
+// wall right of the void) is stretched across the column, and the rest is
+// shifted so it ends at lid b's slot like every other pillar. Lid b-1's void
+// stays whole, so the pillar is just a fatter one.
+col_xs = (25 - vw/2)*sx;   // mid-wall right of the void (which ends at 25 - Void_wall): voids keep their shape
 // solid = true fills the void (outer outline only): the tube runs roof to bed.
 module col_cell(solid) scale([sx, sy]) if (solid) polygon(source_outline); else source_cell();
 // Stretch at xs within the band Y y0..y1 (source units): the slice at xs
@@ -676,12 +737,13 @@ module col_band(xs, y0, y1, solid) intersection() {
   }
   translate([-1, y0*sy]) square([25*sx + col_extra + 2, (y1 - y0)*sy]);
 }
-// Above Y 20 the stretch is at X 23 (right of the void); the foot below it
+// Above Y 20 the stretch is at col_xs (right of the void); the foot below it
 // is stretched at X 20, where it is flat on the bed, so the column foot keeps
-// the same bottom chamfer as every other pillar.
+// the same bottom chamfer as every other pillar. The column foot is solid (no
+// foot pocket: the driver bore runs through it).
 module col_profile(pc, b, solid = false) translate([ch_x(pc, b - 1), 0]) {
   col_band(col_xs, -1, 20, solid);
-  col_band(20*sx, 20, 31, solid);
+  col_band(20*sx, 20, 31, true);
 }
 module col_roof(pc, b) translate([ch_x(pc, b - 1) + col_xs, 0]) square([col_extra + 25*sx - col_xs, Roof_thickness]);
 // A piece = its channel groups, each built as a sub-piece, joined at every
@@ -700,7 +762,7 @@ module piece(pc, left, right, nxt) {
         for (g = [0:ng-1]) translate([ch_x(pc, gb[g]), 0, 0])
           piece_core([for (k = [gb[g]:gb[g+1]-1]) pc[k]], g == 0 ? left : "none",
                      g == ng - 1 ? right : right == "none" ? "none" : "step", g == ng - 1 ? nxt : [],
-                     [for (f = piece_stations(pc)) if (gb[g+1] <= trim_of(pc, f)) f[0]]);
+                     [for (f = piece_stations(pc)) if (gb[g+1] <= trim_of(pc, f)) f[0]], g > 0, g < ng - 1);
         for (b = cols(pc)) for (f = piece_stations(pc)) if (col_here(pc, f, b) && kept(pc, f, b))
           translate([ch_x(pc, b - 1) + col_xs + 0.01, -1, f[0] - eps])
             cube([ch_x(pc, b) + 5*sx - ch_x(pc, b - 1) - col_xs, d + 2, col_zb(pc, f, b) - f[0] + 2*eps]);
@@ -732,7 +794,7 @@ module piece(pc, left, right, nxt) {
             // Lid b-1's void, grown a hair so the fill overlaps its walls
             // (touching faces would leave non-manifold edges).
             linear_extrude(height = h, convexity = 8) translate([ch_x(pc, b - 1), 0])
-              intersection() { col_cell(true); scale([sx, sy]) offset(delta = 0.05) for (v = source_voids) polygon(v); }
+              intersection() { col_cell(true); scale([sx, sy]) offset(delta = 0.05) source_void_shapes(); }
           }
           }
         }
@@ -752,7 +814,7 @@ function col_here(pc, f, b) = kept(pc, f, b - 1) &&
 function grp(pc, g) = let(gb = group_bounds(pc)) [for (k = [gb[g]:gb[g+1]-1]) pc[k]];
 // Z range of lid k's roof web on unscrewed hook f within channel group g
 // (same rule as piece_core), or undef.
-function web_z(g, f, k) = let(b = anchor(g, f), a = b[0] < f[0] ? min(b[1], b[2]) : f[1], z = b[0] < f[0] ? f[0] : b[0])
+function web_z(g, f, k) = let(b = anchor(g, f), a = b[0] < f[0] ? min(b[1], b[2]) : f[1], z = b[0] < f[0] ? f[0] : hz0(b))
   z > a && member(g, f, k) && member(g, b, k) ? [a, z] : undef;
 // Rear end of hook f where both lids beside column b ride on it.
 function col_zb(pc, f, b) = kept(pc, f, b) ? min(seg_end(pc, f, b - 1), seg_end(pc, f, b)) : seg_end(pc, f, b - 1);

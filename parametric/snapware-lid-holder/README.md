@@ -2,7 +2,7 @@
 
 An under-shelf rack that hangs Snapware Total Solution plastic lids vertically, one lid per channel. Every channel prints side by side in one piece, so spacing and parallelism come from the print. A selection wider than the bed splits into pieces that join with knuckle joints. Pieces screw to the shelf through countersunk bosses.
 
-Status: validated. Racks for both the "Newer Costco set" and "Older Costco set" have been printed and installed under a shelf. The default lid lengths are still estimates from retailer container dimensions, so measure your own lids and override them if they differ.
+Status: the channel fit is validated: racks for both the "Newer Costco set" and "Older Costco set" have been printed and installed under a shelf. The current lean version (short hooks, hollow pillars, about a third less filament: ~95 cm³ per Costco rack) keeps the same lid-contact surfaces but has not been printed yet, so print the fit coupon first. The default lid lengths are still estimates from retailer container dimensions, so measure your own lids and override them if they differ.
 
 ## Configuration
 
@@ -29,6 +29,6 @@ openscad -o /tmp/x.stl snapware-lid-holder-test.scad   # tests
 
 ## Print
 
-Print flat, open side down (roof up), which is what `Output = "Print"` produces. PETG or PLA, no supports: only short bridges (~7 mm channel roofs). Walls are multiples of 0.6 mm. A brim is optional.
+Print flat, open side down (roof up), which is what `Output = "Print"` produces. PETG or PLA, no supports: only short bridges (~7 mm channel roofs, ~9.5 mm pillar voids). Walls are multiples of 0.6 mm. A brim is optional.
 
 The channel cross-section derives from a user-supplied STL (`Big+Rectangle+2.stl`). Keep its attribution and original licensing when sharing.

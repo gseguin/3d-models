@@ -27,7 +27,8 @@ shelf for the current set), and slides in from the front until it hits its stop.
   end. A size gets its own clamp-front hook only if its clamp would otherwise
   rest on no hook besides its stop hook (≥ `Clamp_min_engagement` overlap);
   the continuous ledge rail carries the clamp in between. Per-size front
-  hooks for every size were tried: they made the entrance a 40 mm-deep block. The hook runs Station_length in front of the stop wall (under the clamp's
+  hooks for every size were tried: they made the entrance a 40 mm-deep block. The hook runs Station_length (6 mm, just over the 5 mm
+  minimum engagement) in front of the stop wall (under the clamp's
   rear end, the only part the clamp touches) and **ends at the wall**
   (`Stop_tail` = 0). A tail behind the wall was tried: +63 cm³, no contact
   with the clamp. `Stop_tail` > 0 adds it back for the stopping channels only.
@@ -58,17 +59,39 @@ shelf for the current set), and slides in from the front until it hits its stop.
   face is a bridge between two walls (cavity roof ~7 mm, roof webs and step
   bridges < 6 mm, socket cap ~13 mm) or within ~1 mm of the bed.
 - **Minimum filament.** The full channel profile exists only at short
-  crossbar stations. Lids are light, stiff panels.
+  crossbar stations. Lids are light, stiff panels. v5 cut the two Costco
+  racks from 147.5 / 140.4 cm³ to 94.6 / 95.8 cm³ (−36 % / −32 %) with the
+  two measures below; the roof and the ledge rails were left alone.
+  - **Short hooks, long only at screws.** A hook body is `Station_length`
+    (6 mm; 8.4 mm with the stop wall), was 10 (12.4). Every screwed hook is
+    still one screw-tube diameter (12.4 mm) long, but only at the pillars
+    that hold a tube or a joint socket (edge walls, step-boss pillars, screw
+    columns): `hook_relief` cuts the rest back to the body front `hz0`. The
+    long pillar serves the screw: it walls the driver bore front and back and
+    welds the tube to the hook over its full diameter. All gap rules, the
+    trim and the tests measure from `hz0`, since that is where the ledge
+    under the clamp starts. Two long pillars in a row keep the cell between
+    them (a one-lid hook is a plain block, no roof notch).
+  - **Hollow pillars.** Each pillar is a box: `Void_wall` (1.8 mm, 3
+    perimeters; 1.2 is the floor and saves ~7 cm³ more) from the slanted
+    cavity wall and from the next slot's face, roof to source Y 19, plus a
+    pocket in the foot (X ≥ 20.3, `Void_wall` from the bed and the bottom
+    chamfer). No lid-contact surface moves. The void top is the thinned roof
+    line, so the column tube's fill meets the roof (a gap showed there when
+    the void top stayed at Y 5). The column foot has no pocket (the driver
+    bore runs through it), and the column stretch line sits mid-wall right of
+    the void (`col_xs`).
 - Channel cross-section is the user-supplied `Big+Rectangle+2.stl` profile
-  (20 × 30), scaled by `Channel_pitch`/`Channel_depth`. Fit validated: racks for both Costco sets printed and installed.
+  (20 × 30), scaled by `Channel_pitch`/`Channel_depth`. Channel fit validated on v4: racks for both Costco sets printed and installed.
+  The v5 short hooks and hollow pillars change no lid-contact surface but have **not been printed yet**: print the fit coupon or one piece first.
 - **Roof** (shelf side, over the lid cavities and voids) is `Roof_thickness`
-  3.6 mm (6 perimeters; the source profile has 5). It is thinned from below,
+  3.6 mm (6 perimeters; the source profile has 5). It is the weak link for sag
+  (the only member that crosses the 7 mm cavities), so v5 did not thin it. It is thinned from below,
   so the shelf face, the joint socket caps (2.4 mm) and the boss screw seats
   (`Mount_thickness` 5, needed for the countersink) are unchanged. Roof webs
-  and column roofs use the same thickness. With screws at most every
-  `Channels_per_screw` lids, the 30 mm deep comb, not the roof, carries the
-  bending.
-- Print **flat, open side down**, no supports (roof bridges ~7 mm).
+  and column roofs use the same thickness.
+- Print **flat, open side down**, no supports (roof bridges ~7 mm over the
+  cavities, ~9.5 mm over the pillar voids).
 
 ## Geometry
 - **Hooks**: requirements (clamp front end, clamp rear end, stop) per lid
@@ -80,7 +103,7 @@ shelf for the current set), and slides in from the front until it hits its stop.
   web (Y 0..5·sy) to the nearest screwed hook, over its own channels. Gap fills keep clear gaps between full hooks ≤ `gap_lim`
   and screw rows ≤ `Max_mount_spacing`. A fill landing on a narrow hook
   promotes that hook to full instead. Hook fronts are vertical (no lead-in by default).
-- **Rack front** sits at the first hook (27 mm behind the lid fronts for the
+- **Rack front** sits at the first hook (its screw pillars 49.6 mm behind the lid fronts for the
   current set). The `.scad` echoes the setback for mounting flush lids.
 - **Ledge rails**: one 2.4 mm strip per channel, a continuous piece of the
   hooks' ledge: slot-side face flush with the ledge edge (source X 10), from
@@ -149,7 +172,7 @@ shelf for the current set), and slides in from the front until it hits its stop.
   (kept hooks long lids didn't need) and each lid's own clamp (left long lids
   only end hooks). Hooks can only end at a column (the end tube would
   otherwise stand in the next lid's path). The column screw's tube becomes
-  the hook's left end. Decided rear hooks first. Not done on multi-piece
+  the hook's left end. Gaps are measured to hook bodies (`hz0`). Decided rear hooks first. Not done on multi-piece
   racks, where a piece's left edge may be a joint.
 - **Joints**: at each station shared by neighbouring pieces, piece *k*'s right
   boss is shortened by `Socket_cap` ("male"), and piece *k+1* has a C-socket
@@ -162,6 +185,12 @@ bottom of the profile and are too flexible to carry a row on their own (an
 estimated 2–3 mm sag at 220 mm span), so every station stays screwed.
 Station spans of ~200 mm between screws estimate at < 1.5 mm deflection
 (counting only the roof). Real stiffness is higher because of the dividers.
+
+Across a hook, the pillars are stiff boxes (roof, two walls, foot) and the
+roof over each 7 mm cavity is the flexible part. For a 5-lid span between
+screws carrying half of five ~50 g lids, a 3.6 × 6 mm roof strip estimates at
+~0.15 mm sag (~0.4 mm allowing 3× for PETG creep); the v4 12.4 mm hooks were
+about half that. Estimates, not measurements.
 
 ## Data
 Counts were checked against the cited Costco/frugalhotspot listings
@@ -190,12 +219,16 @@ and clamps.**
 
 ## Fit test
 The coupon is a front hook, `max_gap − Fit_test_gap_margin` of open space
-(default 50 − 5 = 45 mm), then a stop hook. The rack's own gaps are capped at
-`gap_max` per lid and are ~31–35 mm for the current set.
+(default 44 − 5 = 39 mm), then a stop hook. Its front hook is `fit_front`
+(9 mm) long, so the whole clamp sits on the coupon. The rack's own gaps are capped at
+`gap_max` per lid and are at most ~36 mm for the current set.
 
 ## Change impact
 - Profile changes affect `Stop_top`, `ledge_top`, `rail_x` and the lead-in
   (all in source coordinates scaled by `sx`/`sy`).
 - Station logic changes must keep tests C (flush fronts, exact stops),
-  G (joints), S (intermediate screws), N (nothing behind a stop), O (hook gap), P (clamp ends on hooks) and R (hook around the stop) passing.
+  G (joints), S (intermediate screws), N (nothing behind a stop), O (hook gap), P (clamp ends on hooks), R (hook around the stop) and L (screw pillars one tube long) passing.
+- Void changes: keep the main void above source Y 20 and the pocket right of
+  X 20 (the column foot is stretched there), and `col_xs` right of the void
+  (test V). `cavity()` subtracts the voids, since they reach left of X 18.
 - Run `snapware-lid-holder-test.scad` for every preset in the `.json`.

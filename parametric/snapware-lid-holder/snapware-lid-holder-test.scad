@@ -33,7 +33,7 @@ for (pc = pieces) for (k = [0:len(pc)-1]) let(r = stop_z(pc[k]),
 // rear end) and exactly Stop_tail behind it ---
 for (pc = pieces) for (k = [0:len(pc)-1]) let(sz = stop_z(pc[k]),
     st = [for (st = piece_stations(pc)) if (len([for (sk = station_stops(pc, st)) if (sk[0] == k) 1]) > 0) st][0],
-    front = sz - Stop_thickness - st[0], behind = seg_end(pc, st, k) - sz) {
+    front = sz - Stop_thickness - hz0(st), behind = seg_end(pc, st, k) - sz) {
   echo(str("R: ", names[pc[k][1]], " hook ", front, " | stop ", Stop_thickness, " | ", behind));
   assert(front >= Station_length - eps && abs(behind - Stop_tail) < eps, "R FAIL: hook around the stop wall");
 }
@@ -57,7 +57,7 @@ for (k = [1:len(mount_sts)-1]) let(g = st_zc(mount_sts[k]) - st_zc(mount_sts[k-1
 // --- O: along every channel, the clear gap between consecutive hooks it
 // rides on is <= Clamp_contact_length - 2*Clamp_min_engagement ---
 for (pc = pieces) for (k = [0:len(pc)-1]) let(r = rail(pc[k]),
-    sts = [for (st = piece_stations(pc)) if (kept(pc, st, k)) [st[0], seg_end(pc, st, k)]])
+    sts = [for (st = piece_stations(pc)) if (kept(pc, st, k)) [hz0(st), seg_end(pc, st, k)]])
   for (j = [1:len(sts)-1]) let(g = sts[j][0] - sts[j-1][1]) {
     echo(str("O: ", names[pc[k][1]], " gap ", g, " max ", gap_max(pc[k])));
     assert(g <= gap_max(pc[k]) + eps, "O FAIL: clamp can't bridge the gap between hooks");
@@ -65,7 +65,7 @@ for (pc = pieces) for (k = [0:len(pc)-1]) let(r = rail(pc[k]),
 
 if (fit) let(sts = piece_stations(pieces[0])) {
   echo(str("O: fit test stations ", len(sts), " gap ", sts[1][0] - sts[0][1], " = ", fit_gap, " (max ", max_gap, " - margin)"));
-  assert(len(sts) == 2 && abs(sts[1][0] - sts[0][1] - fit_gap) < eps, "O FAIL: fit test gap");
+  assert(len(sts) == 2 && abs(hz0(sts[1]) - sts[0][1] - fit_gap) < eps, "O FAIL: fit test gap");
 }
 
 // --- F: stations disjoint and in order; front station at Z=0 ---
@@ -115,7 +115,7 @@ for (pc = pieces) for (k = [0:len(pc)-1]) let(r = rail(pc[k]),
 // --- P: at rest the clamp's rear end sits Station_length on its stop hook,
 // and the clamp also rests on at least one other hook by >= Clamp_min_engagement ---
 if (!fit) for (pc = pieces) for (k = [0:len(pc)-1]) let(cs = clamp_span(pc[k]),
-    segs = [for (st = piece_stations(pc)) if (kept(pc, st, k)) [st[0], seg_end(pc, st, k)]],
+    segs = [for (st = piece_stations(pc)) if (kept(pc, st, k)) [hz0(st), seg_end(pc, st, k)]],
     rr = [for (sg = segs) if (sg[0] <= cs[1] - SL + eps && sg[1] >= cs[1] - eps) sg],
     other = [for (sg = segs) if (rr == [] || sg != rr[0]) let(o = min(sg[1], cs[1]) - max(sg[0], cs[0])) if (o >= Clamp_min_engagement - eps) o]) {
   echo(str("P: ", names[pc[k][1]], " clamp ", cs, " stop hook ", len(rr), " other hooks under clamp ", other));
@@ -163,9 +163,22 @@ echo(str("I: countersink depth ", cs_depth, " seat ", Mount_thickness, " bore ",
 assert(cs_depth <= Mount_thickness - 1.5 && Driver_bore_diameter >= Screw_head_diameter + 1, "I FAIL");
 
 // --- J: walls are 0.6 mm nozzle multiples ---
-for (t = [Boss_wall, Socket_wall, Strip_width, Stop_thickness]) {
+for (t = [Boss_wall, Socket_wall, Strip_width, Stop_thickness, Void_wall]) {
   echo(str("J: wall ", t));
   assert(abs(t/0.6 - round(t/0.6)) < 1e-6, str("J FAIL: ", t, " not a 0.6 multiple"));
 }
+// --- L: lean hooks: the hook under the clamp is Station_length long (enough
+// for the minimum engagement); every screwed hook is one tube long at its
+// screw pillars, and its body front is never in front of them ---
+echo(str("L: Station_length ", Station_length, " >= engagement ", Clamp_min_engagement));
+assert(Station_length >= Clamp_min_engagement - eps, "L FAIL: hook shorter than the clamp engagement");
+if (!fit) for (k = [0:len(mount_sts)-1]) let(st = mount_sts[k], e = min(st[4][0][3], st[2]),
+    room = k == 0 ? e : e - max([for (q = stations) if (q[1] <= st[0] + eps) q[1], 0])) {
+  echo(str("L: screwed hook ", st[0], "..", st[1], " body front ", hz0(st), " screw pillar ", e - st[0], " tube ", 2*boss_r));
+  assert(hz0(st) >= st[0] - eps && (e - st[0] >= 2*boss_r - eps || room < 2*boss_r + eps), "L FAIL: screw pillar shorter than its tube");
+}
+// --- V: pillar voids keep printable walls and stay clear of the column stretch lines ---
+echo(str("V: void wall ", Void_wall, " right edge ", 25 - vw, " column stretch at ", col_xs/sx));
+assert(Void_wall >= 1.2 - eps && 25 - vw < col_xs/sx, "V FAIL: void walls");
 echo("ALL TESTS PASSED");
 cube(0.1);   // non-empty output so the exit code reflects the asserts
