@@ -214,10 +214,13 @@ boss_r = Driver_bore_diameter/2 + Boss_wall;
 col_extra = max(0, 2*boss_r + 2*Step_clearance - 7*sx);   // screw column spacing (see Intermediate screws)
 boss_overlap = Boss_wall;                 // tube wall fused into station wall
 boss_off = boss_r - boss_overlap;         // tube centre beyond piece edge
-// Dovetail joint (see Joints): the tail's width at its head and at its neck.
+// Dovetail joint (see Joints): the tail's depth, capped so the socket keeps
+// Socket_wall of the piece wall whatever the clearance, and its width at its
+// head and at its neck.
+joint_depth = min(Joint_depth, 5*sx - Socket_wall - Joint_clearance);
 joint_head = 2*(boss_r - Socket_wall - Joint_clearance);
-joint_neck = joint_head - 2*Joint_depth*tan(Joint_angle);
-joint_ext = Joint_clearance + Joint_depth;   // tail reach past its boss
+joint_neck = joint_head - 2*joint_depth*tan(Joint_angle);
+joint_ext = Joint_clearance + joint_depth;   // tail reach past its boss
 joint_gap = boss_off + boss_r + Joint_clearance;   // edge-to-edge gap of joined pieces
 
 // ---------- Helpers ----------
@@ -486,8 +489,8 @@ assert(Screw_head_diameter > Screw_hole_diameter);
 assert(Driver_bore_diameter >= Screw_head_diameter + 1, "Driver bore must clear screw head");
 assert(cs_depth <= Mount_thickness - 1.5, "Countersink leaves insufficient seat");
 assert(joint_neck >= 3, "Dovetail neck too thin: lower Joint_depth or Joint_angle");
-assert(5*sx - Joint_depth - Joint_clearance >= Socket_wall - eps, "Dovetail socket leaves too little of the piece wall: lower Joint_depth");
-assert(Joint_height + Joint_depth <= d - max(Roof_thickness, Mount_thickness) - 5, "Dovetail would reach the roof or the screw seat");
+assert(5*sx - joint_depth - Joint_clearance >= Socket_wall - eps, "Dovetail socket leaves too little of the piece wall: raise Channel_pitch or lower Socket_wall");
+assert(Joint_height + joint_depth <= d - max(Roof_thickness, Mount_thickness) - 5, "Dovetail would reach the roof or the screw seat");
 assert(max_gap >= 10, "Shortest clamp too short for the minimum engagement");
 // Step boss sits right of the shorter neighbour's slot and inside its cell.
 step_off = boss_off;   // step bosses sit like edge bosses, against the last pillar
@@ -658,8 +661,8 @@ module step_boss() translate([step_off, 0, 0]) boss_solid(0);
 // the load wedges the dovetail tight. The joint slides together along Y:
 // mount the right piece, then lift the left one into it and screw it.
 // Tail outline (X, Z) from the right piece's wall face; +X = into that wall.
-module joint_tail_2d() polygon([[0, joint_neck/2], [Joint_depth, joint_head/2],
-                                [Joint_depth, -joint_head/2], [0, -joint_neck/2]]);
+module joint_tail_2d() polygon([[0, joint_neck/2], [joint_depth, joint_head/2],
+                                [joint_depth, -joint_head/2], [0, -joint_neck/2]]);
 module joint_prism(y0, y1) translate([0, y0, 0]) rotate([-90, 0, 0]) linear_extrude(height = y1 - y0, convexity = 4) children();
 // Everything below (bed side of) the 45 deg plane through [x, y] that rises towards -X.
 module joint_slope(x, y) translate([0, 0, -boss_r]) linear_extrude(height = 2*boss_r)
@@ -671,14 +674,14 @@ module joint_tail() let(xw = boss_r + Joint_clearance) intersection() {
     translate([xw, 0]) joint_tail_2d();
     translate([boss_r - Boss_wall, -joint_neck/2]) square([Boss_wall + Joint_clearance + eps, joint_neck]);
   }
-  joint_slope(xw + Joint_depth, d - Joint_height);
+  joint_slope(xw + joint_depth, d - Joint_height);
 }
 // In a left wall (origin on the piece edge, at the station's screw line).
 // The ceiling clears the tail's top by Joint_clearance (square to the slope).
 module joint_socket_cut() {
   intersection() {
     joint_prism(0, d + 1) offset(delta = Joint_clearance) joint_tail_2d();
-    joint_slope(Joint_depth, d - Joint_height - Joint_clearance*sqrt(2));
+    joint_slope(joint_depth, d - Joint_height - Joint_clearance*sqrt(2));
   }
   joint_prism(d - Joint_foot_relief[0], d + 1) offset(delta = Joint_clearance + Joint_foot_relief[1]) joint_tail_2d();
 }

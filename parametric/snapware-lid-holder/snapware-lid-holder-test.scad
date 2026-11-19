@@ -146,15 +146,16 @@ if (!fit) for (pc = pieces) {
 }
 
 // --- H: dovetail joint: the tail is held, clears its socket, and leaves the wall and tube whole ---
-echo(str("H: tail head ", joint_head, " neck ", joint_neck, " depth ", Joint_depth, " clearance ", Joint_clearance,
-         " wall behind socket ", 5*sx - Joint_depth - Joint_clearance, " seam gap ", joint_gap));
-assert(joint_head - joint_neck >= 4*Joint_clearance + 1, "H FAIL: tail can pull out of its socket");
+echo(str("H: tail head ", joint_head, " neck ", joint_neck, " depth ", joint_depth, " clearance ", Joint_clearance,
+         " wall behind socket ", 5*sx - joint_depth - Joint_clearance, " seam gap ", joint_gap));
+// The head is wider than the socket's mouth (neck + clearance each side) by at least 1 mm.
+assert(joint_head - joint_neck - 2*Joint_clearance >= 1, "H FAIL: tail can pull out of its socket");
 assert(joint_neck >= 3, "H FAIL: tail neck too thin");
 // The socket keeps Socket_wall beside it (the wall is one tube long there) and behind it (lid slot).
 assert(boss_r - joint_head/2 - Joint_clearance >= Socket_wall - eps, "H FAIL: wall beside the socket too thin");
-assert(5*sx - Joint_depth - Joint_clearance >= Socket_wall - eps, "H FAIL: socket too close to the lid slot");
+assert(5*sx - joint_depth - Joint_clearance >= Socket_wall - eps, "H FAIL: socket too close to the lid slot");
 // The socket's ceiling climbs 45 deg from Joint_height (back) to the wall face; the tail's top on to the tube.
-assert(Joint_height + Joint_depth <= d - max(Roof_thickness, Mount_thickness) - 5, "H FAIL: joint reaches the roof or the screw seat");
+assert(Joint_height + joint_depth <= d - max(Roof_thickness, Mount_thickness) - 5, "H FAIL: joint reaches the roof or the screw seat");
 // Joined pieces: the neighbour's wall stands Joint_clearance off the tube.
 assert(abs(joint_gap - (boss_off + boss_r + Joint_clearance)) < eps, "H FAIL: seam gap");
 // Every screwed hook of a right-hand piece hangs on a tail of its left neighbour.

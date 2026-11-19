@@ -182,7 +182,7 @@ shelf for the current set), and slides in from the front until it hits its stop.
   (an overhang, no bridge; a flat ceiling was tried first), the tail's top
   slopes the same, and the load wedges the dovetail tight. `Joint_clearance` (0.2 mm)
   on every face, plus 0.2 mm over the first 0.6 mm for elephant's foot; the
-  socket leaves 1.8 mm of the 5 mm wall. It slides together along Y: mount
+  socket leaves 1.8 mm of the 5 mm wall (the tail gets shallower as the clearance grows). It slides together along Y: mount
   piece *k+1*, lift piece *k* into it, screw it. At least two joints per seam
   lock spacing and parallelism. Seam 11.4 mm. Tried and dropped: a C-socket on
   piece *k+1* wrapping piece *k*'s shortened boss (read as a broken cylinder;
