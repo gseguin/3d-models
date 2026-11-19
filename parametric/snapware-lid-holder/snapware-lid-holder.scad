@@ -3,7 +3,7 @@
 // Hangs Snapware Total Solution plastic lids vertically under a shelf, one lid
 // per channel, all channels side by side in ONE printed piece so spacing and
 // parallelism come from the print. If the selection is wider than the bed it
-// is split into pieces that interlock with knuckle joints (see Joints below).
+// is split into pieces that hang on each other by sliding dovetails (see Joints).
 //
 // Source cross-section: user-supplied Big+Rectangle+2.stl (one 20 mm pitch,
 // 30 mm deep channel). Retain attribution and original licensing when sharing.
@@ -24,8 +24,7 @@
 //    one screw-tube diameter just at the pillars that hold a screw; every
 //    pillar is a hollow box (Void_wall walls) with a pocket in its foot.
 //  - Prints without supports in PETG or PLA: only short bridges (cavity
-//    roofs ~7 mm, pillar voids ~9 mm, webs/step-boss bridges < 6 mm, socket
-//    caps ~13 mm).
+//    roofs ~7 mm, pillar voids ~9 mm, webs/step-boss bridges < 6 mm).
 //
 // Axes (mounted): X across channels, Y down from shelf (Y=0 on shelf), Z along
 // lid insertion; open front at Z=0, each size's stop at Z = its lid length.
@@ -46,7 +45,7 @@ Set_quantity = 1; // [1:1:4]
 Selection = "All sizes"; // [All sizes,Small round,Medium round,Large round,Extra large round,Small rectangle,Medium rectangle,Large rectangle,Small square,Medium square,Large square]
 // Print = print orientation; Installed preview = as mounted, with ghost lids.
 Output = "Print"; // [Print,Fit test,Installed preview]
-// 0 = all pieces laid out side by side; N = only piece N (for export).
+// 0 = all pieces, one behind the other along Y; N = only piece N (for export). Centred on the origin.
 Piece = 0; // [0:1:6]
 // Channels on the fit-test coupon.
 Fit_test_channels = 1; // [1:1:3]
@@ -117,7 +116,8 @@ Custom_bed_x = 256; // [100:1:500]
 Custom_bed_y = 256; // [100:1:500]
 
 /* [Joint fit] */
-Joint_clearance = 0.25; // [0.1:0.05:0.5]
+// Gap on every face of the dovetails that key neighbouring pieces together.
+Joint_clearance = 0.2; // [0.1:0.05:0.5]
 
 /* [Hidden] */
 // Design constants (not Customizer settings; override with -D if needed).
@@ -127,7 +127,7 @@ Channel_pitch = 20;
 Channel_depth = 30;
 // Roof (shelf side) over the lid cavities and lightening voids; the source
 // profile has 5 (scaled by Channel_depth/30). Thinned from below, so the shelf
-// face, bosses and joint sockets are unchanged. 6 perimeters at 0.6 mm.
+// face and bosses are unchanged. 6 perimeters at 0.6 mm.
 Roof_thickness = 3.6;
 Stop_thickness = 2.4;
 // Hook length behind the stop wall (0 = the piece ends at the wall; the clamp
@@ -162,8 +162,15 @@ Boss_wall = 1.2;
 Step_clearance = 0.5;
 // Kept clear around each piece (brim, skirt, wipe tower clearance).
 Bed_margin = 5;
+// Dovetail joint between pieces: wall left beside and behind the socket, tail
+// depth into the neighbour's wall, flank angle, height up from the bed (it
+// slides in along Y), and the extra socket clearance over the first layers
+// (elephant's foot).
 Socket_wall = 1.8;
-Socket_cap = 2.4;
+Joint_depth = 3;
+Joint_angle = 25;
+Joint_height = 15;
+Joint_foot_relief = [0.6, 0.2];   // [height, extra clearance]
 Layout_gap = 10;
 // Hooks closer than this along Z are joined into one.
 Min_hook_gap = 2;
@@ -207,12 +214,11 @@ boss_r = Driver_bore_diameter/2 + Boss_wall;
 col_extra = max(0, 2*boss_r + 2*Step_clearance - 7*sx);   // screw column spacing (see Intermediate screws)
 boss_overlap = Boss_wall;                 // tube wall fused into station wall
 boss_off = boss_r - boss_overlap;         // tube centre beyond piece edge
-sock_ri = boss_r + Joint_clearance;
-sock_ro = sock_ri + Socket_wall;
-sock_off = sock_ro - boss_overlap;        // socket centre beyond piece edge
-sock_cut = -(boss_off - 0.4);             // socket opening plane (rel. centre)
-sock_open_hw = sqrt(sock_ri*sock_ri - sock_cut*sock_cut);
-joint_gap = boss_off + sock_off;          // edge-to-edge gap of joined pieces
+// Dovetail joint (see Joints): the tail's width at its head and at its neck.
+joint_head = 2*(boss_r - Socket_wall - Joint_clearance);
+joint_neck = joint_head - 2*Joint_depth*tan(Joint_angle);
+joint_ext = Joint_clearance + Joint_depth;   // tail reach past its boss
+joint_gap = boss_off + boss_r + Joint_clearance;   // edge-to-edge gap of joined pieces
 
 // ---------- Helpers ----------
 function sum(v, k=0) = k >= len(v) ? 0 : v[k] + sum(v, k+1);
@@ -251,7 +257,7 @@ fit_C = min_clamp;
 channels = fit ? [for (k = [0:Fit_test_channels-1]) [2*(fit_rail - Stop_thickness + Front_overhang) - fit_C, chosen[0], fit_C]] :
   qsort_stop([for (i = chosen) for (c = [1:(Copies=="One per size" ? 1 : counts[i])]) [lid_lengths[i], i, lid_clamps[i]]]);
 n_ch = len(channels);
-edge_ext = sock_ro + sock_off;            // worst-case overhang past an edge
+edge_ext = boss_off + boss_r + joint_ext; // worst-case overhang past an edge
 // Usable bed [x, y] (mm). H2D: 350x320 single nozzle, 325x320 both nozzles.
 bed = Printer == "Bambu H2D single nozzle" ? [350, 320] :
       Printer == "Bambu H2D both nozzles" ? [325, 320] :
@@ -263,8 +269,8 @@ bed = Printer == "Bambu H2D single nozzle" ? [350, 320] :
       Printer == "Creality K1 Max" ? [300, 300] : [Custom_bed_x, Custom_bed_y];
 bed_long = max(bed) - 2*Bed_margin;
 bed_short = min(bed) - 2*Bed_margin;
-// Longest footprint along Z (longest rail + socket overhang).
-max_piece_depth = rail(channels[0]) + sock_ro;
+// Longest footprint along Z (longest rail).
+max_piece_depth = rail(channels[0]);
 // Piece width on the long bed axis if its depth fits the short one, else swap.
 max_print_width = max_piece_depth <= bed_short ? bed_long : bed_short;
 max_print_depth = max_piece_depth <= bed_short ? bed_short : bed_long;
@@ -302,10 +308,9 @@ n_pieces = len(pieces);
 // Partial stations are screwed at the step through a full-height boss set in
 // the shorter neighbour channel, right of its slot (that lid's panel hangs in
 // the slot), and bridged to the station at roof level over the panel.
-min_step = 2*sock_ro + 1;
-// Screw rows only need that spacing where joint sockets may sit (multi-piece
-// racks); on a single piece two tubes just must not touch.
-min_screw_step = n_pieces > 1 ? min_step : 2*boss_r + 1;
+min_step = 2*boss_r + 5.1;
+// Two screw tubes just must not touch (a joint is no longer than its tube).
+min_screw_step = 2*boss_r + 1;
 function dedup(v) = [for (k = [0:len(v)-1]) if (k == 0 || v[k] != v[k-1]) v[k]];
 // stop_z: rear face of the stop wall. Station_length of hook sits in front
 // of it (under the clamp's rear end); Stop_tail behind it (default 0).
@@ -480,7 +485,9 @@ assert(Set_quantity >= 1 && Set_quantity == floor(Set_quantity));
 assert(Screw_head_diameter > Screw_hole_diameter);
 assert(Driver_bore_diameter >= Screw_head_diameter + 1, "Driver bore must clear screw head");
 assert(cs_depth <= Mount_thickness - 1.5, "Countersink leaves insufficient seat");
-assert(sock_open_hw < boss_r - 0.5, "Socket opening would not capture the boss");
+assert(joint_neck >= 3, "Dovetail neck too thin: lower Joint_depth or Joint_angle");
+assert(5*sx - Joint_depth - Joint_clearance >= Socket_wall - eps, "Dovetail socket leaves too little of the piece wall: lower Joint_depth");
+assert(Joint_height + Joint_depth <= d - max(Roof_thickness, Mount_thickness) - 5, "Dovetail would reach the roof or the screw seat");
 assert(max_gap >= 10, "Shortest clamp too short for the minimum engagement");
 // Step boss sits right of the shorter neighbour's slot and inside its cell.
 step_off = boss_off;   // step bosses sit like edge bosses, against the last pillar
@@ -513,7 +520,7 @@ function inner_rec(cw, n, m, C, i, prev) = i >= m ? [] :
   let(t = nearest_b(cw, i*cw[n]/m),
       b = min(n - (m - i), max(prev + 1, n - (m - i)*C, min(prev + C, t))))
   concat([b], inner_rec(cw, n, m, C, i + 1, b));
-for (pc = pieces) assert(piece_length(pc) + sock_ro <= max_print_depth + eps, str("Longest rail (", max_piece_depth, " mm) does not fit the ", Printer, " bed"));
+for (pc = pieces) assert(piece_length(pc) <= max_print_depth + eps, str("Longest rail (", max_piece_depth, " mm) does not fit the ", Printer, " bed"));
 
 // ---------- 2D profile ----------
 source_outline=[[7.0, 5.0], [10.41209, 5.0], [10.89593, 5.05941], [11.35103, 5.2341], [11.75035, 5.51371], [12.07017, 5.88161], [12.29148, 6.31596], [17.87938, 21.66861], [18.0, 22.35265], [18.0, 24.0], [17.93185, 24.51764], [17.73205, 25.0], [17.41421, 25.41421], [17.0, 25.73205], [16.51764, 25.93185], [16.0, 26.0], [10.5, 26.0], [10.0, 26.5], [10.0, 29.5], [10.5, 30.0], [20.17157, 30.0], [20.68921, 29.93185], [21.17157, 29.73205], [21.58579, 29.41421], [24.41421, 26.58579], [24.73205, 26.17157], [24.93185, 25.68921], [25.0, 25.17157], [25.0, 1.0], [4.23607, 1.0], [3.6099, 0.93393], [3.01132, 0.73861], [2.46669, 0.42267], [2.0, 0.0], [0.0, -0.0], [0.0, 29.0], [1.0, 30.0], [4.0, 30.0], [5.0, 29.0], [5.0, 7.0], [5.06815, 6.48236], [5.26795, 6.0], [5.58579, 5.58579], [6.0, 5.26795], [6.48236, 5.06815]];
@@ -629,7 +636,7 @@ ledge_top = 26*sy;
 rail_x = 10*sx + Lead_in + Strip_width/2;
 module strips(pc) let(z0 = hz0(piece_stations(pc)[0])) for (k = [0:len(pc)-1])
   translate([k*p + rail_x - Strip_width/2, ledge_top, z0]) cube([Strip_width, d - ledge_top, stop_z(pc[k]) - z0]);
-// Vertical screw boss; top = Y of its shelf-side face (Socket_cap for a male joint boss).
+// Vertical screw boss; top = Y of its shelf-side face.
 module boss_solid(top) translate([0, top, 0]) rotate([-90, 0, 0]) cylinder(r = boss_r, h = d - top);
 module boss_hole(top) {
   translate([0, -1, 0]) rotate([-90, 0, 0]) cylinder(d = Screw_hole_diameter, h = top + Mount_thickness + 2);
@@ -641,21 +648,47 @@ module boss_hole(top) {
 // full-height tube as a piece edge, against the last pillar. It stands in the
 // shorter neighbour's channel, behind that lid's stop (boss_ok).
 module step_boss() translate([step_off, 0, 0]) boss_solid(0);
-// Socket wrapping the neighbour's male boss; opening faces -X; cap sits between
-// the male boss and the shelf so one screw clamps both pieces.
-module socket_solid() difference() {
-  rotate([-90, 0, 0]) cylinder(r = sock_ro, h = d);
-  translate([0, Socket_cap, 0]) rotate([-90, 0, 0]) cylinder(r = sock_ri, h = d);
-  translate([0, -1, 0]) rotate([-90, 0, 0]) cylinder(d = Screw_hole_diameter, h = Socket_cap + 2);
-  translate([sock_cut - 2*sock_ro, -1, -2*sock_ro]) cube([2*sock_ro, d + 2, 4*sock_ro]);
+// Joints: neighbouring pieces share one row of screws, on the left piece's
+// right bosses. At each station they share, that boss carries a dovetail tail
+// which fits a socket in the right piece's left wall (that edge has no boss).
+// The tail stands on the bed; the socket is open at the bed and closed above,
+// so the right piece's wall rests on the tails. The socket's ceiling slopes
+// 45 deg, from Joint_height at its back up to the wall face, so it prints as
+// a plain overhang with no bridge; the tail's top slopes the same way, and
+// the load wedges the dovetail tight. The joint slides together along Y:
+// mount the right piece, then lift the left one into it and screw it.
+// Tail outline (X, Z) from the right piece's wall face; +X = into that wall.
+module joint_tail_2d() polygon([[0, joint_neck/2], [Joint_depth, joint_head/2],
+                                [Joint_depth, -joint_head/2], [0, -joint_neck/2]]);
+module joint_prism(y0, y1) translate([0, y0, 0]) rotate([-90, 0, 0]) linear_extrude(height = y1 - y0, convexity = 4) children();
+// Everything below (bed side of) the 45 deg plane through [x, y] that rises towards -X.
+module joint_slope(x, y) translate([0, 0, -boss_r]) linear_extrude(height = 2*boss_r)
+  polygon([[x - d, y - d], [x + d, y + d], [x + d, 2*d], [x - d, 2*d]]);
+// On a right boss (origin on its axis): the tail and its neck from the tube.
+// Its top is Joint_height up at the head and slopes up towards the tube.
+module joint_tail() let(xw = boss_r + Joint_clearance) intersection() {
+  joint_prism(0, d) {
+    translate([xw, 0]) joint_tail_2d();
+    translate([boss_r - Boss_wall, -joint_neck/2]) square([Boss_wall + Joint_clearance + eps, joint_neck]);
+  }
+  joint_slope(xw + Joint_depth, d - Joint_height);
+}
+// In a left wall (origin on the piece edge, at the station's screw line).
+// The ceiling clears the tail's top by Joint_clearance (square to the slope).
+module joint_socket_cut() {
+  intersection() {
+    joint_prism(0, d + 1) offset(delta = Joint_clearance) joint_tail_2d();
+    joint_slope(Joint_depth, d - Joint_height - Joint_clearance*sqrt(2));
+  }
+  joint_prism(d - Joint_foot_relief[0], d + 1) offset(delta = Joint_clearance + Joint_foot_relief[1]) joint_tail_2d();
 }
 
-// left: "boss" | "socket" | "none"; right: "boss" | "step" (step bosses
-// only, for a group inside a piece) | "none".
+// left: "boss" | "joint" (dovetail sockets in the wall, no boss) | "none";
+// right: "boss" | "step" (step bosses only, for a group inside a piece) | "none".
 // Each station spans the channels whose rail reaches it; a partial station
 // has a step boss at its step, a full-width one a boss at the piece edge.
-// nxt: the piece joined on the right ([] if none); full-width stations it
-// shares get male (joint) bosses.
+// nxt: the piece joined on the right ([] if none); the right bosses of the
+// full-width stations it shares carry the joint tails.
 function is_male(pc, st, nxt) = span(pc, st) == len(pc) && span(nxt, st) > 0;
 function station_stops(pc, st) = !st[3] ? [] :
   [for (k = [0:len(pc)-1]) let(r = rail(pc[k])) if (r > st[0] + eps && r <= st[1] + eps) [k, stop_z(pc[k]), r]];
@@ -704,17 +737,16 @@ module piece_core(pc, left, right, nxt, skip = [], lcol = false, rcol = false) {
       strips(pc);
       for (f = ms) translate([0, 0, st_zc(f)]) {
         if (left == "boss") translate([-boss_off, 0, 0]) boss_solid(0);
-        if (left == "socket") translate([-sock_off, 0, 0]) socket_solid();
         if (right != "none") translate([core_width(span(pc, f)), 0, 0])
           if (span(pc, f) < len(pc)) step_boss();
-          else if (right == "boss") translate([boss_off, 0, 0]) boss_solid(male(f) ? Socket_cap : 0);
+          else if (right == "boss") translate([boss_off, 0, 0]) { boss_solid(0); if (male(f)) joint_tail(); }
       }
     }
     for (f = ms) translate([0, 0, st_zc(f)]) {
       if (left == "boss") translate([-boss_off, 0, 0]) boss_hole(0);
+      if (left == "joint") joint_socket_cut();
       if (span(pc, f) < len(pc) ? right != "none" : right == "boss")
-        translate([core_width(span(pc, f)) + (span(pc, f) < len(pc) ? step_off : boss_off), 0, 0])
-          boss_hole(span(pc, f) < len(pc) ? 0 : male(f) ? Socket_cap : 0);
+        translate([core_width(span(pc, f)) + (span(pc, f) < len(pc) ? step_off : boss_off), 0, 0]) boss_hole(0);
     }
   }
 }
@@ -776,7 +808,8 @@ module piece(pc, left, right, nxt) {
                      [for (f = piece_stations(pc)) if (gb[g+1] <= trim_of(pc, f)) f[0]], g > 0, g < ng - 1);
         for (b = cols(pc)) for (f = piece_stations(pc)) if (col_here(pc, f, b) && kept(pc, f, b))
           translate([ch_x(pc, b - 1) + col_xs + 0.01, -1, f[0] - eps])
-            cube([ch_x(pc, b) + 5*sx - ch_x(pc, b - 1) - col_xs, d + 2, col_zb(pc, f, b) - f[0] + 2*eps]);
+            // Stops a hair short of lid b's slot: cutting past the pillar would slit the roof there.
+            cube([ch_x(pc, b) + 5*sx - ch_x(pc, b - 1) - col_xs - 0.02, d + 2, col_zb(pc, f, b) - f[0] + 2*eps]);
       }
       // Roof webs (unscrewed hooks) across the column gap, where the lids on
       // both sides have one.
@@ -840,7 +873,20 @@ module ghost_lids(pc) for (k = [0:len(pc)-1]) let(L = pc[k][0], cs = clamp_span(
 function piece_width(k) = core_w(pieces[k]);
 // Installed X origin of piece k (joined edge to edge).
 function installed_x(k) = k == 0 ? 0 : installed_x(k-1) + piece_width(k-1) + joint_gap;
-function print_x(k) = k == 0 ? 0 : print_x(k-1) + piece_width(k-1) + 2*edge_ext + Layout_gap;
+function piece_left(k) = fit ? "none" : k == 0 ? "boss" : "joint";
+// Footprint of piece k in its own coordinates, bosses and joints included:
+// X range and Z (print Y) range. Everything is laid out centred on the origin.
+function piece_xr(k) = fit ? [0, piece_width(k)] :
+  [k == 0 ? -boss_off - boss_r : 0, piece_width(k) + boss_off + boss_r + (k < n_pieces-1 ? joint_ext : 0)];
+function piece_zr(k) = let(pc = pieces[k], r = fit ? 0 : boss_r)
+  [min(concat([for (f = piece_stations(pc)) f[0]], [for (f = piece_mounts(pc)) st_zc(f) - r])),
+   max(concat([piece_length(pc)], [for (f = piece_mounts(pc)) st_zc(f) + r]))];
+function piece_cx(k) = (piece_xr(k)[0] + piece_xr(k)[1])/2;
+// Print layout: pieces one behind the other along Y, Layout_gap apart.
+function print_y(k) = k == 0 ? 0 : print_y(k-1) + piece_zr(k-1)[1] - piece_zr(k-1)[0] + Layout_gap;
+print_len = print_y(n_pieces-1) + piece_zr(n_pieces-1)[1] - piece_zr(n_pieces-1)[0];
+installed_cx = (piece_xr(0)[0] + installed_x(n_pieces-1) + piece_xr(n_pieces-1)[1])/2;
+installed_cz = (min([for (k = [0:n_pieces-1]) piece_zr(k)[0]]) + max([for (k = [0:n_pieces-1]) piece_zr(k)[1]]))/2;
 
 echo(preset = Pack, printer = Printer, bed = bed, total_lids = sum(counts), channels = n_ch, pieces = n_pieces);
 for (k = [0:n_pieces-1]) {
@@ -858,17 +904,19 @@ for (k = [0:n_pieces-1]) {
 echo(str("Rack front edge sits ", stations[0][0], " mm behind the lid fronts (+ Front_overhang): mount it that far back for flush lids"));
 echo(str("Hangs ", d + max([for (c = channels) lid_widths[c[1]]]), " mm below the shelf (rack depth + tallest hanging lid)"));
 echo(str("Stop at ", Stop_at, "; clamp hooks centred on the long side; shortest clamp ", min_clamp, " mm -> max hook gap ", max_gap, " mm (each lid: its own clamp - ", 2*Clamp_min_engagement, ")"));
-echo(str("Screws: countersunk #8/M4, length >= ", Mount_thickness + Socket_cap, " mm + shelf engagement"));
+echo(str("Screws: countersunk #8/M4, length >= ", Mount_thickness, " mm + shelf engagement"));
 
 module oriented() if (Reverse_order) mirror([1, 0, 0]) children(); else children();
 
 oriented() for (k = [0:n_pieces-1]) if (Piece == 0 || Piece == k+1) {
   pc = pieces[k];
-  left = fit ? "none" : k == 0 ? "boss" : "socket";
+  left = piece_left(k);
+  zr = piece_zr(k);
   right = fit ? "none" : "boss";
   nxt = k < n_pieces-1 ? pieces[k+1] : [];
   if (Output == "Installed preview")
-    translate([installed_x(k), 0, 0]) rotate([-90, 0, 0]) { piece(pc, left, right, nxt); ghost_lids(pc); }
+    translate([installed_x(k) - installed_cx, -installed_cz, 0]) rotate([-90, 0, 0]) { piece(pc, left, right, nxt); ghost_lids(pc); }
   else
-    translate([Piece == 0 ? print_x(k) : 0, 0, d]) rotate([-90, 0, 0]) piece(pc, left, right, nxt);
+    translate([-piece_cx(k), Piece == 0 ? print_y(k) - zr[0] - print_len/2 : -(zr[0] + zr[1])/2, d])
+      rotate([-90, 0, 0]) piece(pc, left, right, nxt);
 }

@@ -43,7 +43,7 @@ if (n_ch > 1) for (k = [1:n_ch-1]) assert(stop_z(channels[k]) <= stop_z(channels
 
 // --- D: pieces fit on the print bed ---
 for (k = [0:n_pieces-1]) {
-  W = piece_width(k) + 2*edge_ext; Lp = piece_length(pieces[k]) + sock_ro;
+  W = piece_width(k) + 2*edge_ext; Lp = piece_length(pieces[k]);
   echo(str("D: piece ", k+1, " footprint ", W, " x ", Lp, " max ", max_print_width, " x ", max_print_depth));
   assert(W <= max_print_width && Lp <= max_print_depth, "D FAIL: piece exceeds bed");
 }
@@ -96,10 +96,9 @@ for (pc = pieces) for (st = piece_mounts(pc)) let(n = span(pc, st)) if (n < len(
   assert(clear >= 0.5 - eps, "K FAIL: step boss hits neighbour clamp/stop");
 }
 for (k = [1:len(mount_sts)-1]) let(g = st_zc(mount_sts[k]) - st_zc(mount_sts[k-1])) {
-  // Socket spacing only matters on multi-piece racks; else tubes must not touch.
+  // Tubes (and the joints on them, no longer than a tube) must not touch.
   echo(str("K: boss zc gap ", g, " >= ", min_screw_step));
-  assert(g >= min_screw_step - eps && min_screw_step >= 2*boss_r + 1 - eps &&
-         (n_pieces == 1 || min_screw_step >= 2*sock_ro + 1 - eps), "K FAIL: bosses/sockets overlap");
+  assert(g >= min_screw_step - eps && min_screw_step >= 2*boss_r + 1 - eps, "K FAIL: bosses overlap");
 }
 
 // --- N: nothing behind a stop: every station part of a channel starts in front
@@ -146,16 +145,21 @@ if (!fit) for (pc = pieces) {
   }
 }
 
-// --- H: socket captures the male boss but clears it ---
-echo(str("H: boss_r=", boss_r, " socket ri=", sock_ri, " opening half-width=", sock_open_hw,
-         " opening plane ", sock_cut, " vs neighbour wall ", -boss_off));
-assert(sock_ri > boss_r, "H FAIL: no joint clearance");
-assert(sock_open_hw < boss_r - 0.5, "H FAIL: boss can slip out of socket");
-assert(sock_cut > -boss_off, "H FAIL: socket collides with neighbour station");
-// Opening must clear the boss-to-wall web (chord where tube meets wall).
-web_hw = sqrt(boss_r*boss_r - boss_off*boss_off);
-echo(str("H: web half-width ", web_hw, " < opening ", sock_open_hw));
-assert(web_hw < sock_open_hw, "H FAIL: socket opening narrower than boss web");
+// --- H: dovetail joint: the tail is held, clears its socket, and leaves the wall and tube whole ---
+echo(str("H: tail head ", joint_head, " neck ", joint_neck, " depth ", Joint_depth, " clearance ", Joint_clearance,
+         " wall behind socket ", 5*sx - Joint_depth - Joint_clearance, " seam gap ", joint_gap));
+assert(joint_head - joint_neck >= 4*Joint_clearance + 1, "H FAIL: tail can pull out of its socket");
+assert(joint_neck >= 3, "H FAIL: tail neck too thin");
+// The socket keeps Socket_wall beside it (the wall is one tube long there) and behind it (lid slot).
+assert(boss_r - joint_head/2 - Joint_clearance >= Socket_wall - eps, "H FAIL: wall beside the socket too thin");
+assert(5*sx - Joint_depth - Joint_clearance >= Socket_wall - eps, "H FAIL: socket too close to the lid slot");
+// The socket's ceiling climbs 45 deg from Joint_height (back) to the wall face; the tail's top on to the tube.
+assert(Joint_height + Joint_depth <= d - max(Roof_thickness, Mount_thickness) - 5, "H FAIL: joint reaches the roof or the screw seat");
+// Joined pieces: the neighbour's wall stands Joint_clearance off the tube.
+assert(abs(joint_gap - (boss_off + boss_r + Joint_clearance)) < eps, "H FAIL: seam gap");
+// Every screwed hook of a right-hand piece hangs on a tail of its left neighbour.
+if (n_pieces > 1) for (k = [1:n_pieces-1]) for (st = piece_mounts(pieces[k]))
+  assert(is_male(pieces[k-1], st, pieces[k]), "H FAIL: hook without a joint on its left end");
 
 // --- I: fasteners ---
 echo(str("I: countersink depth ", cs_depth, " seat ", Mount_thickness, " bore ", Driver_bore_diameter,

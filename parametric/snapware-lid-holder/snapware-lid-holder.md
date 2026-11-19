@@ -57,7 +57,7 @@ shelf for the current set), and slides in from the front until it hits its stop.
   into balanced, interlocking pieces, longest lids first.
 - **No supports** in PETG or PLA. Printed open side down; every downward
   face is a bridge between two walls (cavity roof ~7 mm, roof webs and step
-  bridges < 6 mm, socket cap ~13 mm) or within ~1 mm of the bed.
+  bridges < 6 mm) or within ~1 mm of the bed.
 - **Minimum filament.** The full channel profile exists only at short
   crossbar stations. Lids are light, stiff panels. v5 cut the two Costco
   racks from 147.5 / 140.4 cm³ to 94.6 / 95.8 cm³ (−36 % / −32 %) with the
@@ -87,7 +87,7 @@ shelf for the current set), and slides in from the front until it hits its stop.
 - **Roof** (shelf side, over the lid cavities and voids) is `Roof_thickness`
   3.6 mm (6 perimeters; the source profile has 5). It is the weak link for sag
   (the only member that crosses the 7 mm cavities), so v5 did not thin it. It is thinned from below,
-  so the shelf face, the joint socket caps (2.4 mm) and the boss screw seats
+  so the shelf face and the boss screw seats
   (`Mount_thickness` 5, needed for the countersink) are unchanged. Roof webs
   and column roofs use the same thickness.
 - Print **flat, open side down**, no supports (roof bridges ~7 mm over the
@@ -122,9 +122,8 @@ shelf for the current set), and slides in from the front until it hits its stop.
   reach). Tried and dropped: the tube right of that lid's slot on a
   roof-level neck (looked detached), and the slot slit through the tube
   (looked truncated; the user confirmed the panel doesn't need it). Screw
-  rows are spaced ≥ `min_screw_step`: the joint-socket spacing
-  (`min_step`, ~19 mm) on multi-piece racks, but only tube-to-tube (~13 mm)
-  on a single piece. So close hooks get their own screws instead of a roof web
+  rows are spaced ≥ `min_screw_step`: tube-to-tube (~13 mm); a joint is no
+  longer than its tube. So close hooks get their own screws instead of a roof web
   to a screwed neighbour, which made a wide double plate.
 - **Bosses**: every screwed hook is screwed at both ends. Piece edges use vertical
   tubes: screws go in from the open side, the driver goes up the bore, and the
@@ -174,10 +173,21 @@ shelf for the current set), and slides in from the front until it hits its stop.
   otherwise stand in the next lid's path). The column screw's tube becomes
   the hook's left end. Gaps are measured to hook bodies (`hz0`). Decided rear hooks first. Not done on multi-piece
   racks, where a piece's left edge may be a joint.
-- **Joints**: at each station shared by neighbouring pieces, piece *k*'s right
-  boss is shortened by `Socket_cap` ("male"), and piece *k+1* has a C-socket
-  wrapping it. The socket's cap sits between the boss and the shelf, so one screw
-  clamps both pieces. At least two joints (the front one plus one stop row) lock parallelism.
+- **Joints**: neighbouring pieces share one row of screws, on piece *k*'s
+  right bosses (complete tubes). At each station they share, that boss carries
+  a dovetail tail that fits a socket in piece *k+1*'s left wall, which has no
+  boss. The tail stands on the bed (`Joint_height` 15 mm at its head); the
+  socket is open at the bed and closed above, so piece *k+1*'s edge rests on
+  the tails. The socket's ceiling slopes 45° from its back up to the wall face
+  (an overhang, no bridge; a flat ceiling was tried first), the tail's top
+  slopes the same, and the load wedges the dovetail tight. `Joint_clearance` (0.2 mm)
+  on every face, plus 0.2 mm over the first 0.6 mm for elephant's foot; the
+  socket leaves 1.8 mm of the 5 mm wall. It slides together along Y: mount
+  piece *k+1*, lift piece *k* into it, screw it. At least two joints per seam
+  lock spacing and parallelism. Seam 11.4 mm. Tried and dropped: a C-socket on
+  piece *k+1* wrapping piece *k*'s shortened boss (read as a broken cylinder;
+  thin open sleeve, 13 mm bridged cap), and full bosses on both pieces with a
+  dovetail between them (two tubes side by side, 26 mm seam, double screws).
 
 ## Structure
 Each stop row carries the rear half of its lids. The ledge rails sit at the
