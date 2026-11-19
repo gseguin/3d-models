@@ -540,13 +540,24 @@ module source_cell() difference() { polygon(source_outline); source_void_shapes(
 // the Roof_thickness line, within the cell's X 0..25.
 roof_s = Roof_thickness / sy;
 assert(Roof_thickness >= 1.2 && roof_s <= 5 + eps, "Roof_thickness must be 1.2 .. 5*Channel_depth/30");
+// Left of the slanted wall's fillet (X 10.41209) the tops move straight up;
+// the fillet itself slides up along the slanted wall's own line, so that wall
+// stays one straight face up to the roof (no step where the cut ends).
 module roof_cut() if (roof_s < 5 - eps) intersection() {
   translate([0, roof_s]) square([25, 8 - roof_s]);   // covers the rounded cavity corners (to Y 7)
-  minkowski() {
-    union() { difference() { translate([-1, 1.5]) square([27, 40]); polygon(source_outline); } source_void_shapes(); }
-    translate([0, -(5 - roof_s)]) square([0.01, 5 - roof_s]);
+  union() {
+    minkowski() {
+      union() { intersection() { source_air(); translate([-1, 0]) square([11.41209, 40]); } source_void_shapes(); }
+      translate([0, -(5 - roof_s)]) square([0.01, 5 - roof_s]);
+    }
+    minkowski() {
+      intersection() { source_air(); translate([10.41209, 0]) square([8, 40]); }
+      polygon([[-0.01, 0], [0, 0], [-dr*void_m, -dr], [-dr*void_m - 0.01, -dr]]);
+    }
   }
+  dr = 5 - roof_s;
 }
+module source_air() difference() { translate([-1, 1.5]) square([27, 40]); polygon(source_outline); }
 module channel_section(n) difference() {
   union() {
     for (k = [0:n-1]) translate([k*p, 0]) scale([sx, sy]) intersection() {
@@ -650,10 +661,10 @@ function station_stops(pc, st) = !st[3] ? [] :
   [for (k = [0:len(pc)-1]) let(r = rail(pc[k])) if (r > st[0] + eps && r <= st[1] + eps) [k, stop_z(pc[k]), r]];
 // Part of a pillar kept one tube long where it holds a screw (source coords,
 // pillar after channel i at X i*p; i = -1 is the piece's left wall). Its left
-// edge runs through the roof, then through the cavity's air 1 mm off the
-// slanted wall, and cuts the ledge at X 17; the right edge stops at the next
+// edge runs through the cavity's air 1 mm off the slanted wall, from the
+// roof down, and cuts the ledge at X 17; the right edge stops at the next
 // slot's roof fillet, so no roof overhangs.
-pillar_keep = [[11, -5], [11, 5.5], [16.88, 21.67], [17, 24], [17, 40], [26.8, 40], [26.8, -5]];
+pillar_keep = [[7.18, -5], [16.88, 21.67], [17, 24], [17, 40], [26.8, 40], [26.8, -5]];
 // Cut that shortens screwed hook f (over n channels) to its body front hz0,
 // except at the pillars in longs. Two long pillars in a row keep the cell
 // between them (no notch in a one-lid hook).
