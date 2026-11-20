@@ -2,6 +2,12 @@
 
 An under-shelf rack that hangs Snapware Total Solution plastic lids vertically, one lid per channel. Every channel prints side by side in one piece, so spacing and parallelism come from the print. A selection wider than the bed splits into pieces that hang on each other by sliding dovetails, sharing one row of screws at each seam. Pieces screw to the shelf through countersunk bosses.
 
+![Turntable of a two-piece rack](snapware-lid-holder-turntable.gif)
+
+![Two pieces sliding together on their dovetails](snapware-lid-holder-dovetail-assembly.gif)
+
+Full-resolution videos: [turntable](snapware-lid-holder-turntable.mp4), [dovetail assembly](snapware-lid-holder-dovetail-assembly.mp4).
+
 Status: the channel fit is validated: racks for both the "Newer Costco set" and "Older Costco set" have been printed and installed under a shelf. The current lean version (short hooks, hollow pillars, about a third less filament: ~95 cm³ per Costco rack) keeps the same lid-contact surfaces but has not been printed yet, so print the fit coupon first. The default lid lengths are still estimates from retailer container dimensions, so measure your own lids and override them if they differ.
 
 ## Configuration
